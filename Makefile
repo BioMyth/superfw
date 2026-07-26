@@ -193,11 +193,11 @@ src/menu_messages.h:	res/messages.py
 %.gba.comp:	%.gba.bin apultra/apultra
 	./apultra/apultra $< $@
 
-firmware.ewram.gba.comp:	firmware.ewram.gba ./upkr/target/release/upkr
-	./upkr/target/release/upkr -l $(COMPRESSION_RATIO) $< $@
+firmware.ewram.gba.comp:	firmware.ewram.gba ./upkr.bin
+	./upkr.bin -l $(COMPRESSION_RATIO) $< $@
 
-%.db.comp:	%.db ./upkr/target/release/upkr
-	./upkr/target/release/upkr -l $(COMPRESSION_RATIO) $< $@
+%.db.comp:	%.db ./upkr.bin
+	./upkr.bin -l $(COMPRESSION_RATIO) $< $@
 
 %.pack.comp:	%.pack apultra/apultra
 	./apultra/apultra $< $@
@@ -208,8 +208,8 @@ firmware.ewram.gba.comp:	firmware.ewram.gba ./upkr/target/release/upkr
 apultra/apultra:
 	make -C apultra
 
-upkr/target/release/upkr:
-	cd upkr/ && cargo build --release
+upkr.bin:
+	g++ -o upkr.bin upkr.cc -O3 -ffast-math
 
 clean:
 	rm -f ldscripts/*.i *.gba *.elf *.payload *.map res/*.comp emu/*.comp *.comp src/menu_messages.h src/messages_data.h
