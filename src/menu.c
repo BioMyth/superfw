@@ -1466,6 +1466,7 @@ void render_browser(volatile uint8_t *frame) {
       if (smenu.browser.seloff + i >= smenu.browser.dispentries)
         break;
 
+      char szstr[16] = {0};
       t_centry *e = sdr_state->fileorder[smenu.browser.seloff + i];
 
       unsigned iconidx = (e->attr & AM_HID) ? ((e->attr & AM_DIR) ? ICON_HFOLDER : ICON_HFILE) :
@@ -1474,9 +1475,10 @@ void render_browser(volatile uint8_t *frame) {
 
       render_icon(2, (i+1)*16, iconidx);
 
-      char szstr[16];
-      human_size(szstr, sizeof(szstr), e->filesize);
-      draw_rightj_text(szstr, frame, SCREEN_WIDTH - 2, (1 + i) * 16);
+      if (!(e->attr & AM_DIR)) {
+        human_size(szstr, sizeof(szstr), e->filesize);
+        draw_rightj_text(szstr, frame, SCREEN_WIDTH - 2, (1 + i) * 16);
+      }
 
       // Animate the row entries if they are too long!
       if (i == smenu.browser.selector - smenu.browser.seloff)
