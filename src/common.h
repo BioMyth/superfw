@@ -193,6 +193,11 @@ unsigned apunpack8(const uint8_t *src, uint8_t *dst);
 // Decompress (VRAM version), returns written bytes
 unsigned apunpack16(const uint8_t *src, uint8_t *dst);
 
+// Decompress (WRAM version), returns written bytes
+unsigned upkr_unpack(uint8_t *dst, const uint8_t *src);
+// Decompress (VRAM version), returns written bytes
+unsigned upkr_unpack16(uint8_t *dst, const uint8_t *src);
+
 // Some info/misc stuff
 typedef struct {
   uint32_t patch_count;

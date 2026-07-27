@@ -536,7 +536,7 @@ unsigned load_extemu_rom(const char *fn, uint32_t fs, const t_emu_loader *ldinfo
       set_supercard_mode(MAPPED_SDRAM, true, true);
       return ERR_LOAD_NOEMU;
     }
-    ptr += apunpack16(emupload, ptr);
+    ptr += upkr_unpack16(ptr, emupload);
     set_supercard_mode(MAPPED_SDRAM, true, true);
   }
   else {
