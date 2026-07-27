@@ -25,6 +25,8 @@
 #include "common.h"
 #include "patchengine.h"
 
+#pragma GCC optimize ("Os")
+
 typedef struct {
   uint32_t signature;    // "PTDB" in ASCII
   uint32_t dbversion;    // Format version

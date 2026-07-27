@@ -18,6 +18,7 @@
 
 #include <string.h>
 
+#include "compiler.h"
 #include "gbahw.h"
 #include "patchengine.h"
 #include "fatfs/ff.h"
@@ -442,8 +443,7 @@ static int strcmp16(const uint16_t *a, const uint16_t *b) {
   return *a - *b;
 }
 
-__attribute__((noinline))
-int filesort(const void *a, const void *b) {
+NOINLINE int filesort(const void *a, const void *b) {
   const t_centry *ca = *(t_centry**)a;
   const t_centry *cb = *(t_centry**)b;
 
@@ -455,8 +455,7 @@ int filesort(const void *a, const void *b) {
   return strcmp16(ca->sortname, cb->sortname);
 }
 
-__attribute__((noinline))
-int romsort(const void *a, const void *b) {
+NOINLINE int romsort(const void *a, const void *b) {
   const t_flash_game_entry *ca = (t_flash_game_entry*)a;
   const t_flash_game_entry *cb = (t_flash_game_entry*)b;
 
@@ -855,14 +854,6 @@ void patch_gen_callback(bool confirm) {
   browser_open_gba(spop.p.load.i.romfn, spop.p.load.i.romfs, false);
 }
 
-const t_emu_loader * get_emu_info(const char *ext) {
-  for (unsigned i = 0; emu_platforms[i].extension; i++)
-    if (!strcasecmp(ext, emu_platforms[i].extension))
-      return emu_platforms[i].loaders;
-
-  return NULL;
-}
-
 static void load_patchdb_action(bool confirm) {
   if (confirm) {
     FIL fd;
@@ -932,8 +923,7 @@ static void insert_recent_fn(const char *fn) {
   smenu.recent.maxentries++;
 }
 
-__attribute__((noinline))
-static bool recent_flush() {
+NOINLINE static bool recent_flush() {
   // Flush to disk!
   FIL fo;
   if (FR_OK != f_open(&fo, RECENT_FILEPATH, FA_WRITE | FA_CREATE_ALWAYS))
@@ -1073,8 +1063,7 @@ void start_emu_game(const t_emu_loader *ldinfo, const char *fn, uint32_t fs) {
   }
 }
 
-__attribute__((noinline))
-static void browser_open(const char *fn, uint32_t fs) {
+NOINLINE static void browser_open(const char *fn, uint32_t fs) {
   unsigned l = strlen(fn);
   if (!strcasecmp(&fn[l-4], ".gba"))
     // GBA ROMs (most likely)

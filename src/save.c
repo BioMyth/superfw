@@ -29,6 +29,8 @@
 #include "save.h"
 #include "nanoprintf.h"
 
+#pragma GCC optimize ("Os")
+
 // All reading/writing of SRAM should be centralized here, except for IGM/DirSav/Patches.
 
 #define SRAM_BASE_U8        ((volatile uint8_t *)(0x0E000000))

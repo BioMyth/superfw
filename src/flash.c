@@ -25,6 +25,8 @@
 #include "gbahw.h"
 #include "supercard_driver.h"
 
+#pragma GCC optimize ("Os")
+
 // Supercard internal flash routines
 // Assumes the code runs from IW/EWRAM!
 

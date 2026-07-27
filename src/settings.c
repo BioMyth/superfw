@@ -25,6 +25,8 @@
 #include "nanoprintf.h"
 #include "util.h"
 
+#pragma GCC optimize ("Os")
+
 unsigned lang_lookup(uint16_t code);
 uint16_t lang_getcode();
 
