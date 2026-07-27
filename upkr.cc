@@ -1,7 +1,7 @@
 // upkr.cpp -- single file C++ implementation of the upkr compression format.
 //
 // This is mostly derived from https://github.com/exoticorn/upkr using an LLM.
-// Some tweaks and optimizations have been added, including an extra level 10.
+// Some tweaks and optimizations have been added, including some extra levels.
 // Greedy compression (level 0) has been dropped altoghether.
 //
 // Public Domain - David Guillen Fandos <david@davidgf.net>
@@ -968,8 +968,7 @@ static void usage(int code) {
             "Usage:\n"
             "  upkr [-l LEVEL] <infile> [<outfile>]   compress\n"
             "  upkr -d <infile> [<outfile>]           decompress\n\n"
-            "  -l, --level N    compression level 1-10 (default 2)\n"
-            "                   10 is beyond the reference levels: slower,\n"
+            "  -l, --level N    compression level 1-15 (default 2)\n"
             "                   marginally smaller\n"
             "  -1 .. -9         short form of --level\n"
             "  -d, -u           decompress\n"
@@ -1008,8 +1007,8 @@ int main(int argc, char **argv) {
             files++;
         }
     }
-    if (level < 1 || level > 10) {
-        fprintf(stderr, "error: level must be 1-10\n");
+    if (level < 1 || level > 15) {
+        fprintf(stderr, "error: level must be 1-15\n");
         return 1;
     }
     if (infile.empty()) infile = "-";
