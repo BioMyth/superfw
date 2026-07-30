@@ -175,11 +175,19 @@ static int main_gba() {
 
   unsigned prev_frame = frame_count;
   uint32_t prev_keys = REG_KEYINPUT ^ 0x3FF;
+  uint32_t hold_frame_count = 0;
   while (1) {
     uint32_t ckeys = REG_KEYINPUT ^ 0x3FF;
     if (ckeys != prev_keys) {
       menu_keypress(ckeys);
       prev_keys = ckeys;
+      hold_frame_count = 0;
+    }
+    else if (ckeys == KEY_BUTTUP || ckeys == KEYBUTTDOWN)
+       hold_frame_count++;
+       if ((hold_frame_count % 30) == 0) {
+            menu_keypress(ckeys);
+       }
     }
     unsigned cframe = frame_count;
     menu_render(frame_count - prev_frame);
