@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "config.h"
 #include "emu.h"
 
 #define MAX(a, b) ((a > b) ? (a) : (b))
@@ -42,24 +43,6 @@
 #define BM_SET(bm, n)          ((bm)[BM_IDX(bm, n)] |=  BMMASK(bm, n))
 #define BM_CLR(bm, n)          ((bm)[BM_IDX(bm, n)] &= ~BMMASK(bm, n))
 #define BM_TEST(bm, n)         ((bm)[BM_IDX(bm, n)] &   BMMASK(bm, n))
-
-#define MAX_FN_LEN                 256
-#define FLASHG_MAXFN_CNT           32            // No more than 32 games in NOR
-
-#define SUPERFW_DIR               "/.superfw"
-#define ROMCONFIG_PATH            "/.superfw/config/"
-#define PATCHDB_PATH              "/.superfw/patches/"
-#define CHEATS_PATH               "/.superfw/cheats/"
-#define EMULATORS_PATH            "/.superfw/emulators/"
-#define GBC_EMULATOR_PATH         "/.superfw/emulators/gbc-emu.gba"
-#define SETTINGS_FILEPATH         "/.superfw/settings.txt"
-#define RECENT_FILEPATH           "/.superfw/recent.txt"
-#define UISETTINGS_FILEPATH       "/.superfw/ui-settings.txt"
-#define FLASHBACKUPTMP_FILEPATH   "/.superfw/flash_backup.tmp"
-#define FLASHBACKUP_FILEPTRN      "/.superfw/flash_backup-%02x%02x%02x%02x.bin"
-
-#define PENDING_SAVE_FILEPATH     "/.superfw/pending-save.txt"
-#define PENDING_SRAM_TEST         "/.superfw/pending-sram-test.txt"
 
 extern const uint8_t  dldi_payload[];
 extern const uint32_t dldi_payload_size;

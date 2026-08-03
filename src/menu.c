@@ -33,6 +33,7 @@
 #include "cheats.h"
 #include "ingame.h"
 #include "emu.h"
+#include "recent.h"
 #include "flash_mgr.h"
 #include "sha256.h"
 #include "supercard_driver.h"
@@ -71,8 +72,6 @@ enum {
 #endif
 };
 
-#define BROWSER_MAXFN_CNT     (16*1024)
-#define RECENT_MAXFN_CNT          (200)
 #define BROWSER_ROWS                 8
 #define RECENT_ROWS                  9
 #define NORGAMES_ROWS                8
@@ -376,12 +375,6 @@ typedef struct {
   uint16_t sortname[MAX_FN_LEN];       // Pre-decoded and sort-friendly name.
 } t_centry;
 _Static_assert (sizeof(t_centry) % 4 == 0, "t_centry must be word-friendly");
-
-typedef struct {
-  uint32_t fname_offset;     // Basename offset in fpath (precalculated!)
-  char fpath[MAX_FN_LEN];
-} t_rentry;
-_Static_assert (sizeof(t_rentry) % 4 == 0, "t_rentry must be word-friendly");
 
 // Pointer to SDRAM, where we place some data:
 //  - Scratch area 2MiB (for FW updates)
@@ -843,6 +836,31 @@ static void browser_open_gba(const char *fn, uint32_t fs, bool prompt_patchgen) 
   }
 }
 
+#ifdef SUPPORT_NORGAMES
+static void browser_open_nor(const t_flash_game_entry * e) {
+  // Use attributes to determine patched save method.
+  const bool game_no_save = GET_GATTR_SAVEM(e->gattrs) <= SaveTypeNone;
+  const bool game_uses_dsaving = (e->gattrs & GATTR_SAVEDS);
+
+  t_rom_launch_settings lh_sett = {
+    .use_cheats = true,              // Defaults to true (just preferred, might be disabled/N/A)
+    .rtcts = rtcvalue_default
+  };
+  load_rom_settings(e->game_name, NULL, &lh_sett);
+
+  // Attempt to find a cheat file if cheats are enabled.
+  prepare_gba_cheats((char*)&e->gamecode, e->gamever, &spop.p.norld.l, e->game_name, lh_sett.use_cheats);
+
+  // Load and set default and sane settings honoring defaults and preferences.
+  prepare_gba_settings(&spop.p.norld.l, game_uses_dsaving, lh_sett.rtcts, game_no_save, e->game_name);
+
+  // Show load ROM menu.
+  spop.pop_num = POPUP_GBA_NORLOAD;
+  spop.submenu = GbaLoadPopInfo;
+  spop.selector = 0;
+}
+#endif
+
 void patch_gen_callback(bool confirm) {
   // Generate patches if confirm was selected
   if (confirm) {
@@ -897,142 +915,27 @@ unsigned guess_file_type(const uint8_t *header) {
   return FileTypeUnknown;
 }
 
-static void insert_recent_fn(const char *fn) {
-  for (unsigned i = 0; i < smenu.recent.maxentries; i++) {
-    if (!strcmp(sdr_state->rentries[i].fpath, fn)) {
-      // Found a matching file, move it to position 0, unless it's there already.
-      if (i) {
-        t_rentry tmp;
-        dma_memcpy16(&tmp, &sdr_state->rentries[i], sizeof(tmp) / 2);   // Copy entry to tmp
-        memmove32(&sdr_state->rentries[1], &sdr_state->rentries[0], i * sizeof(sdr_state->rentries[0]));
-        dma_memcpy16(&sdr_state->rentries[0], &tmp, sizeof(tmp) / 2);
-      }
-      return;
-    }
-  }
-
-  // Not in the list, push all items back and insert it in the first position
-  if (smenu.recent.maxentries) {
-    unsigned movecnt = MIN(smenu.recent.maxentries, RECENT_MAXFN_CNT - 1);
-    memmove32(&sdr_state->rentries[1], &sdr_state->rentries[0], movecnt * sizeof(sdr_state->rentries[0]));
-  }
-
-  const char *pbn = file_basename(fn);
-  sdr_state->rentries[0].fname_offset = pbn - fn;
-  dma_memcpy16(sdr_state->rentries[0].fpath, fn, (strlen(fn) + 1 + 1) / 2);
-  smenu.recent.maxentries++;
-}
-
-NOINLINE static bool recent_flush() {
-  // Flush to disk!
-  FIL fo;
-  if (FR_OK != f_open(&fo, RECENT_FILEPATH, FA_WRITE | FA_CREATE_ALWAYS))
-    return false;
-
-  // Write stuff to disk. Use a 1KiB buffer and flush as full blocks fill.
-  unsigned coff = 0;
-  char tmpbuf[1024];
-  tmpbuf[0] = 0;
-
-  for (unsigned i = 0; i < smenu.recent.maxentries; i++) {
-    unsigned fnlen = strlen(sdr_state->rentries[i].fpath);
-    memcpy(&tmpbuf[coff], sdr_state->rentries[i].fpath, fnlen);
-    coff += fnlen;
-    tmpbuf[coff++] = '\n';
-
-    if (coff >= 512) {
-      UINT wrbytes;
-      if (FR_OK != f_write(&fo, tmpbuf, 512, &wrbytes) || wrbytes != 512) {
-        f_close(&fo);
-        return false;
-      }
-      // Consume the first 512 written bytes
-      memmove(&tmpbuf[0], &tmpbuf[512], coff - 512);
-      coff -= 512;
-    }
-  }
-
-  // Flush the last bytes (if any!)
-  if (coff) {
-    UINT wrbytes;
-    if (FR_OK != f_write(&fo, tmpbuf, coff, &wrbytes) || wrbytes != coff) {
-      f_close(&fo);
-      return false;
-    }
-  }
-
-  f_close(&fo);
-  return true;
-}
-
 static bool insert_recent_flush(const char *fn) {
   // Insert element.
-  insert_recent_fn(fn);
-  return recent_flush();
+  smenu.recent.maxentries = insert_recent_fn(sdr_state->rentries, smenu.recent.maxentries, fn);
+  return recent_flush(sdr_state->rentries, smenu.recent.maxentries);
 }
 
 static bool delete_recent_flush(unsigned entry_num) {
-  if (entry_num + 1 < smenu.recent.maxentries)
-    memmove32(&sdr_state->rentries[entry_num], &sdr_state->rentries[entry_num + 1],
-              (smenu.recent.maxentries - (entry_num + 1)) * sizeof(sdr_state->rentries[0]));
+  smenu.recent.maxentries = delete_recent(sdr_state->rentries, smenu.recent.maxentries, entry_num);
 
-  smenu.recent.maxentries--;
   smenu.recent.selector = MIN(smenu.recent.maxentries - 1, smenu.recent.selector);
-
   if (!smenu.recent.maxentries)
     smenu.menu_tab = MENUTAB_ROMBROWSE;
 
-  return recent_flush();
+  return recent_flush(sdr_state->rentries, smenu.recent.maxentries);
 }
 
 static void recent_reload() {
   smenu.recent.selector = 0;
-  smenu.recent.maxentries = 0;
   smenu.recent.seloff = 0;
   smenu.anim_state = 0;
-
-  FIL fi;
-  if (FR_OK != f_open(&fi, RECENT_FILEPATH, FA_READ))
-    return;
-
-  // Read data block by block.
-  char tmp[1024 + 4];
-  unsigned bcount = 0;
-  while (1) {
-    if (bcount <= 512) {
-      UINT rdbytes;
-      if (FR_OK != f_read(&fi, &tmp[bcount], 512, &rdbytes))
-        return;
-      bcount += rdbytes;
-      tmp[bcount] = 0;
-    }
-
-    if (!bcount)
-      break;
-
-    // Attempt to parse the next path.
-    char *p = strchr(tmp, '\n');
-    if (!p)
-      p = strchr(tmp, '\0');
-    if (!p)
-      break;       // Some path is way too long!
-
-    *p = 0;        // Add the string end char.
-
-    unsigned cnt = strlen(tmp) + 1;
-    if (cnt > 1) {
-      const char *pbn = file_basename(tmp);
-      sdr_state->rentries[smenu.recent.maxentries].fname_offset = pbn - tmp;
-      dma_memcpy16(sdr_state->rentries[smenu.recent.maxentries].fpath, tmp, (cnt + 1) / 2);
-      smenu.recent.maxentries++;
-    }
-
-    // Consume the bytes
-    memmove(&tmp[0], &tmp[cnt], bcount - cnt);
-    bcount -= cnt;
-  }
-
-  f_close(&fi);
+  smenu.recent.maxentries = recent_load(RECENT_FILEPATH, sdr_state->rentries);
 }
 
 void start_emu_game(const t_emu_loader *ldinfo, const char *fn, uint32_t fs) {
@@ -2868,9 +2771,8 @@ static void keypress_menu_recent(unsigned newkeys) {
     }
     else if (newkeys & KEY_BUTTSEL) {
       void recent_del_cb(bool confirm) {
-        if (confirm) {
+        if (confirm)
           delete_recent_flush(smenu.recent.selector);
-        }
       }
       spop.qpop.message = msgs[lang_id][MSG_Q4_DELREC];
       spop.qpop.default_button = msgs[lang_id][MSG_Q_NO];
@@ -2962,30 +2864,8 @@ static void keypress_menu_norbrowse(unsigned newkeys) {
       smenu.fbrowser.seloff   = MIN(smenu.fbrowser.maxentries - 1, smenu.fbrowser.seloff   + NORGAMES_ROWS);
     }
 
-    if (newkeys & KEY_BUTTA) {
-      t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
-
-      // Use attributes to determine patched save method.
-      const bool game_no_save = GET_GATTR_SAVEM(e->gattrs) <= SaveTypeNone;
-      const bool game_uses_dsaving = (e->gattrs & GATTR_SAVEDS);
-
-      t_rom_launch_settings lh_sett = {
-        .use_cheats = true,              // Defaults to true (just preferred, might be disabled/N/A)
-        .rtcts = rtcvalue_default
-      };
-      load_rom_settings(e->game_name, NULL, &lh_sett);
-
-      // Attempt to find a cheat file if cheats are enabled.
-      prepare_gba_cheats((char*)&e->gamecode, e->gamever, &spop.p.norld.l, e->game_name, lh_sett.use_cheats);
-
-      // Load and set default and sane settings honoring defaults and preferences.
-      prepare_gba_settings(&spop.p.norld.l, game_uses_dsaving, lh_sett.rtcts, game_no_save, e->game_name);
-
-      // Show load ROM menu.
-      spop.pop_num = POPUP_GBA_NORLOAD;
-      spop.submenu = GbaLoadPopInfo;
-      spop.selector = 0;
-    }
+    if (newkeys & KEY_BUTTA)
+      browser_open_nor(&sdr_state->nordata.games[smenu.fbrowser.selector]);
     else if (newkeys & KEY_BUTTSEL) {
       // Prompt NOR entry deletion.
       void remove_nor_action(bool confirm) {
