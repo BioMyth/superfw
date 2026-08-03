@@ -200,17 +200,17 @@ firmware.ewram.gba.comp:	firmware.ewram.gba ./upkr.elf
 %.db.comp:	%.db ./upkr.elf
 	./upkr.elf -l $(COMPRESSION_RATIO) $< $@
 
-%.pack.comp:	%.pack apultra/apultra
-	./apultra/apultra $< $@
+%.pack.comp:	%.pack apultra.elf
+	./apultra.elf $< $@
 
 %.ld.i:	%.ld
 	cpp $< -o $@
 
-apultra/apultra:
-	make -C apultra
+apultra.elf:	tools/apultra.cc
+	g++ -std=c++20 -O3 -fomit-frame-pointer $< -o $@
 
-upkr.elf:
-	g++ -o upkr.elf upkr.cc -O3 -ffast-math
+upkr.elf:	tools/upkr.cc
+	g++ -o $@ $< -O3 -ffast-math
 
 clean:
 	rm -f ldscripts/*.i *.gba *.elf *.payload *.map res/*.comp emu/*.comp *.comp src/menu_messages.h src/messages_data.h
