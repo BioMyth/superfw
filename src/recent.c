@@ -41,6 +41,10 @@ NOINLINE bool recent_flush(const t_rentry *rentries, unsigned rcount) {
 
   for (unsigned i = 0; i < rcount; i++) {
     unsigned fnlen = strlen(rentries[i].fpath);
+    if (rentries[i].flags & FLAG_RECENT_NOR) {
+      memcpy(&tmpbuf[coff], "nor:", 4);
+      coff += 4;
+    }
     memcpy(&tmpbuf[coff], rentries[i].fpath, fnlen);
     coff += fnlen;
     tmpbuf[coff++] = '\n';
@@ -70,9 +74,9 @@ NOINLINE bool recent_flush(const t_rentry *rentries, unsigned rcount) {
   return true;
 }
 
-NOINLINE unsigned insert_recent_fn(t_rentry *rentries, unsigned rcount, const char *fn) {
+NOINLINE unsigned insert_recent_fn(t_rentry *rentries, unsigned rcount, const char *fn, unsigned flags) {
   for (unsigned i = 0; i < rcount; i++) {
-    if (!strcmp(rentries[i].fpath, fn)) {
+    if (rentries[i].flags == flags && !strcmp(rentries[i].fpath, fn)) {
       // Found a matching file, move it to position 0, unless it's there already.
       if (i) {
         t_rentry tmp;
@@ -92,6 +96,7 @@ NOINLINE unsigned insert_recent_fn(t_rentry *rentries, unsigned rcount, const ch
 
   const char *pbn = file_basename(fn);
   rentries[0].fname_offset = pbn - fn;
+  rentries[0].flags = flags;
   dma_memcpy16(rentries[0].fpath, fn, (strlen(fn) + 1 + 1) / 2);
   return rcount + 1;
 }
@@ -138,9 +143,15 @@ NOINLINE unsigned recent_load(const char *fpath, t_rentry *rentries) {
 
     unsigned cnt = strlen(tmp) + 1;
     if (cnt > 1) {
-      const char *pbn = file_basename(tmp);
-      rentries[nentries].fname_offset = pbn - tmp;
-      dma_memcpy16(rentries[nentries].fpath, tmp, (cnt + 1) / 2);
+      rentries[nentries].flags = 0;
+      if (!memcmp(tmp, "nor:", 4)) {
+        rentries[nentries].flags |= FLAG_RECENT_NOR;
+        dma_memcpy16(rentries[nentries].fpath, &tmp[4], (cnt - 4 + 1) / 2);
+      }
+      else
+        dma_memcpy16(rentries[nentries].fpath, tmp, (cnt + 1) / 2);
+
+      rentries[nentries].fname_offset = file_basename(rentries[nentries].fpath) - rentries[nentries].fpath;
       nentries++;
     }
 

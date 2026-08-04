@@ -915,9 +915,9 @@ unsigned guess_file_type(const uint8_t *header) {
   return FileTypeUnknown;
 }
 
-static bool insert_recent_flush(const char *fn) {
+static bool insert_recent_flush(const char *fn, unsigned flags) {
   // Insert element.
-  smenu.recent.maxentries = insert_recent_fn(sdr_state->rentries, smenu.recent.maxentries, fn);
+  smenu.recent.maxentries = insert_recent_fn(sdr_state->rentries, smenu.recent.maxentries, fn, flags);
   return recent_flush(sdr_state->rentries, smenu.recent.maxentries);
 }
 
@@ -953,7 +953,7 @@ void start_emu_game(const t_emu_loader *ldinfo, const char *fn, uint32_t fs) {
     unsigned errcode = ERR_LOAD_NOEMU;
     while (ldinfo->emu_name) {
       if (recent_menu)
-        insert_recent_flush(fn);
+        insert_recent_flush(fn, FLAG_RECENT_SD);
 
       unsigned errcode = load_extemu_rom(fn, fs, ldinfo, loadrom_progress);
       if (errcode && errcode != ERR_LOAD_NOEMU)
@@ -2341,7 +2341,7 @@ static void keypress_popup_loadgba(unsigned newkeys) {
     else if (GbaLoadPopInfo == spop.submenu) {
       // Insert the ROM into the recent list (or move it around). Flush to disk!
       if (recent_menu)
-        insert_recent_flush(spop.p.load.i.romfn);
+        insert_recent_flush(spop.p.load.i.romfn, FLAG_RECENT_SD);
 
       // Honor load.patch_type.
       const t_patch *p = get_game_patch(&spop.p.load.i);
@@ -2623,6 +2623,9 @@ static void keypress_popup_norload(unsigned newkeys) {
         .ts_step = rtcspeed_default
       };
 
+      if (recent_menu)
+        insert_recent_flush(e->game_name, FLAG_RECENT_NOR);
+
       // TODO Handle errors, finish missing stuff.
       unsigned err = launch_gba_nor(
         e->game_name,
@@ -2760,13 +2763,24 @@ static void keypress_menu_recent(unsigned newkeys) {
     }
     if (newkeys & KEY_BUTTA) {
       t_rentry *e = &sdr_state->rentries[smenu.recent.selector];
-      // stat() the file since we need the size, and validate that it exists!
-      FILINFO info;
-      FRESULT res = f_stat(e->fpath, &info);
-      if (res == FR_OK) {
-        browser_open(e->fpath, info.fsize);
+      if (e->flags & FLAG_RECENT_NOR) {
+        // Try to find the ROM in the current flash metadata.
+        for (unsigned i = 0; i < sdr_state->nordata.gamecnt; i++) {
+          const t_flash_game_entry *fe = &sdr_state->nordata.games[i];
+          if (!strcmp(e->fpath, fe->game_name)) {
+            browser_open_nor(fe);
+            return;
+          }
+        }
+        spop.alert_msg = msgs[lang_id][MSG_ERR_GENERIC];
       } else {
-        spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
+        // stat() the file since we need the size, and validate that it exists!
+        FILINFO info;
+        FRESULT res = f_stat(e->fpath, &info);
+        if (res == FR_OK)
+          browser_open(e->fpath, info.fsize);
+        else
+          spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
       }
     }
     else if (newkeys & KEY_BUTTSEL) {

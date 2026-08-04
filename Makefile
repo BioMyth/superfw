@@ -207,7 +207,7 @@ firmware.ewram.gba.comp:	firmware.ewram.gba ./upkr.elf
 	cpp $< -o $@
 
 apultra.elf:	tools/apultra.cc
-	g++ -std=c++20 -O3 -fomit-frame-pointer $< -o $@
+	g++ -std=c++20 -O3 $< -o $@
 
 upkr.elf:	tools/upkr.cc
 	g++ -o $@ $< -O3 -ffast-math

@@ -24,6 +24,9 @@
 
 #include "config.h"
 
+#define FLAG_RECENT_SD        0
+#define FLAG_RECENT_NOR       1
+
 typedef struct {
   uint16_t flags;            // Bit0: NOR (1) vs SD (0)
   uint16_t fname_offset;     // Basename offset in fpath (precalculated!)
@@ -35,7 +38,7 @@ _Static_assert (sizeof(t_rentry) % 4 == 0, "t_rentry must be word-friendly");
 bool recent_flush(const t_rentry *rentries, unsigned rcount);
 
 // Inserts a filename to the recently played games (or re-orders the list)
-unsigned insert_recent_fn(t_rentry *rentries, unsigned rcount, const char *fn);
+unsigned insert_recent_fn(t_rentry *rentries, unsigned rcount, const char *fn, unsigned flags);
 
 // Deletes a recent entry
 unsigned delete_recent(t_rentry *rentries, unsigned rcount, unsigned entry_num);
