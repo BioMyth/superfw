@@ -2763,6 +2763,7 @@ static void keypress_menu_recent(unsigned newkeys) {
     }
     if (newkeys & KEY_BUTTA) {
       t_rentry *e = &sdr_state->rentries[smenu.recent.selector];
+      #ifdef SUPPORT_NORGAMES
       if (e->flags & FLAG_RECENT_NOR) {
         // Try to find the ROM in the current flash metadata.
         for (unsigned i = 0; i < sdr_state->nordata.gamecnt; i++) {
@@ -2773,7 +2774,10 @@ static void keypress_menu_recent(unsigned newkeys) {
           }
         }
         spop.alert_msg = msgs[lang_id][MSG_ERR_GENERIC];
-      } else {
+      }
+      else
+      #endif
+      {
         // stat() the file since we need the size, and validate that it exists!
         FILINFO info;
         FRESULT res = f_stat(e->fpath, &info);
