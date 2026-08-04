@@ -28,6 +28,7 @@
 #include "common.h"
 #include "fatfs/ff.h"
 
+
 // Global variables
 FATFS sdfs;          // FatFS mounted filesystem
 bool isgba = true;   // Has some alternative paths for NDS.
@@ -128,6 +129,7 @@ uint32_t systime() {
   return (frame_count * 50) / 3;
 }
 
+
 static int main_gba() {
   // Setup WAITCNT for faster SD-card access.
   REG_WAITCNT = 0x40c0;    // 0x8-0x9: Use 4/2 waitstates (default, slow for SDRAM)
@@ -174,21 +176,10 @@ static int main_gba() {
   menu_flip();
 
   unsigned prev_frame = frame_count;
-  uint32_t prev_keys = REG_KEYINPUT ^ 0x3FF;
-  uint32_t hold_frame_count = 0;
   while (1) {
     uint32_t ckeys = REG_KEYINPUT ^ 0x3FF;
-    if (ckeys != prev_keys) {
-      menu_keypress(ckeys);
-      prev_keys = ckeys;
-      hold_frame_count = 0;
-    }
-    else if (ckeys == KEY_BUTTUP || ckeys == KEYBUTTDOWN)
-       hold_frame_count++;
-       if ((hold_frame_count % 30) == 0) {
-            menu_keypress(ckeys);
-       }
-    }
+    menu_keypress(ckeys, frame_count - prev_frame);
+    
     unsigned cframe = frame_count;
     menu_render(frame_count - prev_frame);
 
@@ -228,6 +219,7 @@ static int main_nds() {
 int main() {
   // Detect whether we are running on GBA or NDS.
   isgba = !running_on_nds();
+  
   // Similarly detect if EWRAM seems overclockable (GBA but not micro).
   fastew = test_fast_ewram();
 
