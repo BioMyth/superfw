@@ -227,9 +227,9 @@ void draw_text_idx8_bus16_range(const char *s, uint8_t *buffer, unsigned skip, u
           continue;
         }
 
-        uint16_t ch = chinfo.data[0][i];
-        for (unsigned c = 1; c < chinfo.nchars; c++)
-          ch |= chinfo.data[c][i];
+        uint16_t ch = chinfo.data[0][i] 
+        | (chinfo.nchars >= 2 ? chinfo.data[1][i] : 0x0)
+        | (chinfo.nchars >= 3 ? chinfo.data[2][i] : 0x0);
 
         #pragma GCC unroll 16
         for (unsigned j = 0; j < 16; j++)
@@ -258,9 +258,9 @@ void draw_text_idx8_bus16(const char *s, uint8_t *buffer, unsigned pitch, uint8_
 
     unsigned ncols = chinfo.char_width;
     for (unsigned i = 0; i < ncols; i++) {
-      uint16_t ch = chinfo.data[0][i];
-      for (unsigned c = 1; c < chinfo.nchars; c++)
-        ch |= chinfo.data[c][i];
+      uint16_t ch = chinfo.data[0][i] 
+        | (chinfo.nchars >= 2 ? chinfo.data[1][i] : 0x0)
+        | (chinfo.nchars >= 3 ? chinfo.data[2][i] : 0x0);
 
       #pragma GCC unroll 16
       for (unsigned j = 0; j < 16; j++)
