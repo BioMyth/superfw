@@ -16,6 +16,9 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#include <stdbool.h>
+#include <stdint.h>
+
 // Firmware update and flashing tools
 typedef struct {
   uint32_t deviceid;
