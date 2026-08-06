@@ -35,6 +35,7 @@
 #include "emu.h"
 #include "recent.h"
 #include "flash_mgr.h"
+#include "flash.h"
 #include "sha256.h"
 #include "supercard_driver.h"
 

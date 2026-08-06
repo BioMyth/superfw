@@ -288,95 +288,9 @@ unsigned load_nds(const char *filename, const void *dldi_driver);
 const void *get_vfile_ptr(const char *fname);
 int get_vfile_size(const char *fname);
 
-// RTC patches
-extern uint16_t patch_rtc_probe[];
-extern uint16_t patch_rtc_getstatus[];
-extern uint16_t patch_rtc_gettimedate[];
-extern uint16_t patch_rtc_reset[];
-extern const uint32_t patch_rtc_probe_size;
-extern const uint32_t patch_rtc_getstatus_size;
-extern const uint32_t patch_rtc_gettimedate_size;
-extern const uint32_t patch_rtc_reset_size;
-
-// EEPROM patches
-extern uint16_t patch_eeprom_read_sram64k[];
-extern uint16_t patch_eeprom_write_sram64k[];
-extern const uint32_t patch_eeprom_read_sram64k_size;
-extern const uint32_t patch_eeprom_write_sram64k_size;
-
-extern uint16_t patch_eeprom_read_directsave[];
-extern uint16_t patch_eeprom_write_directsave[];
-extern const uint32_t patch_eeprom_read_directsave_size;
-extern const uint32_t patch_eeprom_write_directsave_size;
-
-// FLASH patches
-extern uint16_t patch_flash_read_sram64k[];
-extern uint16_t patch_flash_write_sector_sram64k[];
-extern uint16_t patch_flash_write_byte_sram64k[];
-extern uint16_t patch_flash_erase_sector_sram64k[];
-extern uint16_t patch_flash_erase_device_sram64k[];
-extern const uint32_t patch_flash_read_sram64k_size;
-extern const uint32_t patch_flash_write_byte_sram64k_size;
-extern const uint32_t patch_flash_erase_sector_sram64k_size;
-extern const uint32_t patch_flash_erase_device_sram64k_size;
-extern const uint32_t patch_flash_write_sector_sram64k_size;
-
-extern uint16_t patch_flash_read_sram128k[];
-extern uint16_t patch_flash_write_sector_sram128k[];
-extern uint16_t patch_flash_write_byte_sram128k[];
-extern uint16_t patch_flash_erase_sector_sram128k[];
-extern uint16_t patch_flash_erase_device_sram128k[];
-extern const uint32_t patch_flash_read_sram128k_size;
-extern const uint32_t patch_flash_write_byte_sram128k_size;
-extern const uint32_t patch_flash_erase_sector_sram128k_size;
-extern const uint32_t patch_flash_erase_device_sram128k_size;
-extern const uint32_t patch_flash_write_sector_sram128k_size;
-
-extern uint16_t patch_flash_read_directsave[];
-extern uint16_t patch_flash_write_sector_directsave[];
-extern uint16_t patch_flash_write_byte_directsave[];
-extern uint16_t patch_flash_erase_sector_directsave[];
-extern uint16_t patch_flash_erase_device_directsave[];
-extern const uint32_t patch_flash_read_directsave_size;
-extern const uint32_t patch_flash_write_byte_directsave_size;
-extern const uint32_t patch_flash_erase_sector_directsave_size;
-extern const uint32_t patch_flash_erase_device_directsave_size;
-extern const uint32_t patch_flash_write_sector_directsave_size;
-
-// Firmware update and flashing tools
-typedef struct {
-  uint32_t deviceid;
-  uint32_t size;         // Size in bytes
-  uint32_t regioncnt;    // Erase region count (ideally 1, or perhaps 0)
-  uint32_t blksize;      // Block size in bytes
-  uint32_t blkcount;     // Number of blocks
-  uint32_t blkwrite;     // Buffer writing capabilities (zero means disabled)
-} t_flash_info;
-extern t_flash_info flashinfo;
-
 bool check_superfw(const uint8_t *h, uint32_t *ver);
 bool validate_superfw_variant(const uint8_t *fw);
 bool validate_superfw_checksum(const uint8_t *fw, unsigned fwsize);
-
-typedef struct {
-  uint32_t baseaddr;
-  uint32_t sectorsize;
-  uint32_t sectorcount;
-  uint32_t currsect;
-  uint32_t timeout;
-} t_flash_erase_state;
-
-bool flash_identify(t_flash_info *info);
-bool flash_erase_chip();
-bool flash_erase_sector(uintptr_t addr);
-bool flash_erase_sectors(uint32_t baseaddr, unsigned sectsize, unsigned sectcount);
-void flash_read(uint32_t baseaddr, uint8_t *buf, unsigned size);
-bool flash_check_erased(uintptr_t addr, unsigned size);
-bool flash_program(uint32_t baseaddr, const uint8_t *buf, unsigned size);
-bool flash_program_buffered(uint32_t baseaddr, const uint8_t *buf, unsigned size, unsigned bufsize);
-bool flash_verify(uint32_t baseaddr, const uint8_t *buf, unsigned size);
-void flash_erase_fsm_start(t_flash_erase_state *st, uint32_t baseaddr, unsigned sectsize, unsigned sectorcnt);
-int flash_erase_fsm_step(t_flash_erase_state *st);
 
 // Test/validation stuff
 unsigned sram_test();

@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "gbahw.h"
+#include "compiler.h"
 #include "save.h"
 #include "patchengine.h"
 #include "settings.h"
@@ -32,6 +33,7 @@
 #include "common.h"
 #include "util.h"
 #include "flash_mgr.h"
+#include "flash.h"
 
 // Here we have the ROM loading routines.
 
@@ -201,7 +203,7 @@ unsigned preload_gba_rom(const char *fn, uint32_t fs, t_rom_header *romh) {
   return err ? ERR_LOAD_BADROM : 0;
 }
 
-__attribute__((noinline))
+NOINLINE
 unsigned load_gba_rom(
   const char *fn, uint32_t fs,
   const t_patch *ptch,
@@ -366,7 +368,7 @@ unsigned load_gba_rom(
 }
 
 // Flashes a game to NOR patching it as necessary. This includes DirSav as well as IGM.
-__attribute__((noinline))
+NOINLINE
 unsigned flash_gba_nor(
   const char *fn, uint32_t fs,
   const t_rom_header *rom_header,
@@ -467,7 +469,7 @@ unsigned flash_gba_nor(
   return 0;
 }
 
-__attribute__((noinline))
+NOINLINE
 unsigned launch_gba_nor(
   const char *romfn,
   const uint8_t *normap, unsigned blkcnts,
@@ -518,7 +520,7 @@ unsigned launch_gba_nor(
 }
 
 // Generic-emulator (ie. NES, SMS, ...) loader
-__attribute__((noinline))
+NOINLINE
 unsigned load_extemu_rom(const char *fn, uint32_t fs, const t_emu_loader *ldinfo, progress_fn progress) {
   FIL fd;
   uint8_t *ptr = (uint8_t*)(GBA_ROM_ADDR);
