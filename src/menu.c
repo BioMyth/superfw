@@ -345,6 +345,7 @@ static struct {
     // Launch GBA game from NOR memory
     struct {
       t_load_gba_lcfg l;                  // ROM loading info and settings;
+      const t_flash_game_entry *e;        // NOR game entry on RAM
     } norld;
 
     // Save file menu (.sav files)
@@ -855,6 +856,9 @@ static void browser_open_nor(const t_flash_game_entry * e) {
   // Load and set default and sane settings honoring defaults and preferences.
   prepare_gba_settings(&spop.p.norld.l, game_uses_dsaving, lh_sett.rtcts, game_no_save, e->game_name);
 
+  // Save entry pointer
+  spop.p.norld.e = e;
+
   // Show load ROM menu.
   spop.pop_num = POPUP_GBA_NORLOAD;
   spop.submenu = GbaLoadPopInfo;
@@ -1316,7 +1320,7 @@ void render_flashbrowser(volatile uint8_t *frame) {
       if (smenu.fbrowser.seloff + i >= smenu.fbrowser.maxentries)
         break;
 
-      t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.seloff + i];
+      const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.seloff + i];
       render_icon(2, (i+1)*16, ICON_GBACART);
 
       // Animate the row entries if they are too long!
@@ -1632,7 +1636,7 @@ void render_gba_norload(volatile uint8_t *frame) {
   draw_text_ovf("⯇", frame, 10, 23, 64);
   draw_rightj_text("⯈", frame, SCREEN_WIDTH - 10, 23);
 
-  t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
+  const t_flash_game_entry *e = spop.p.norld.e;
   if (spop.submenu == GbaLoadPopInfo) {
     int save_type = GET_GATTR_SAVEM(e->gattrs);
     render_gbarom_info(frame, e->game_name, false, (const char*)&e->gamecode, e->gamever, save_type);
@@ -2532,7 +2536,7 @@ static void keypress_popup_norload(unsigned newkeys) {
   if (newkeys & KEY_BUTTDOWN)
     spop.selector = MIN(GBALdSetCNT - 1, spop.selector + 1);
 
-  const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
+  const t_flash_game_entry *e = spop.p.norld.e;
   bool uses_dsave = e->gattrs & GATTR_SAVEDS;
   bool uses_igm   = e->gattrs & GATTR_IGM;
   bool uses_rtc   = e->gattrs & GATTR_RTC;
@@ -2600,7 +2604,6 @@ static void keypress_popup_norload(unsigned newkeys) {
 
   if (newkeys & KEY_BUTTA) {
     if (spop.submenu == GbaLoadPopInfo) {
-      const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
       const int stype = GET_GATTR_SAVEM(e->gattrs);
       const EnumSavetype st = stype < 0 ? SaveTypeNone : stype;
       bool uses_dsave = e->gattrs & GATTR_SAVEDS;
@@ -2648,8 +2651,6 @@ static void keypress_popup_norload(unsigned newkeys) {
         .use_cheats = spop.p.norld.l.use_cheats,
         .rtcts = spop.p.norld.l.rtcval
       };
-
-      const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
 
       // We load the loading settings to ensure we do not overwrite them.
       load_rom_settings(e->game_name, &ld_sett, NULL);

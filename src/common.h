@@ -288,10 +288,6 @@ unsigned load_nds(const char *filename, const void *dldi_driver);
 const void *get_vfile_ptr(const char *fname);
 int get_vfile_size(const char *fname);
 
-bool check_superfw(const uint8_t *h, uint32_t *ver);
-bool validate_superfw_variant(const uint8_t *fw);
-bool validate_superfw_checksum(const uint8_t *fw, unsigned fwsize);
-
 // Test/validation stuff
 unsigned sram_test();
 int sdram_test(progress_abort_fn progcb);
