@@ -233,9 +233,7 @@ static inline unsigned savetype_size(EnumSavetype st) {
   return 1 << lut[st];
 }
 
-static inline unsigned rtc_speed_cnt() {
-  return 6;
-}
+#define RTC_SPEED_CNT           6   // Sync with ingame_menu.c
 
 typedef void (*progress_fn)(unsigned done, unsigned total);
 typedef bool (*progress_abort_fn)(unsigned done, unsigned total);
@@ -261,7 +259,8 @@ unsigned prepare_sram_based_savegame(t_sram_load_policy loadp, t_sram_save_polic
 // Loads ROM header
 unsigned preload_gba_rom(const char *fn, uint32_t fs, t_rom_header *romh);
 // Loads a ROM file and launches it.
-unsigned load_gba_rom(const char *fn, uint32_t fs, const struct struct_t_patch *ptch,
+unsigned load_gba_rom(const char *fn, uint32_t fs, const char *savefn,
+                      const struct struct_t_patch *ptch,
                       const t_dirsave_info *dsinfo, bool ingame_menu,
                       const t_rtc_info *rtcinfo, unsigned cheats, progress_fn progress);
 // Launch from NOR
@@ -269,7 +268,7 @@ unsigned  flash_gba_nor(const char *fn, uint32_t fs, const t_rom_header *rom_hea
                         const struct struct_t_patch *ptch, bool dirsaving, bool ingame_menu, bool rtc_patches,
                         const uint8_t *blkmap, progress_fn progress, uint8_t *scratch, unsigned ssize);
 unsigned launch_gba_nor(
-  const char *romfn, const uint8_t *normap, unsigned blkcnts, const t_dirsave_info *dsinfo,
+  const char *romfn, const char *savefn, const uint8_t *normap, unsigned blkcnts, const t_dirsave_info *dsinfo,
   const t_rtc_info *rtcinfo, bool ingame_menu, unsigned cheats);
 
 unsigned load_extemu_rom(const char *fn, uint32_t fs, const t_emu_loader *ldinfo, progress_fn progress);

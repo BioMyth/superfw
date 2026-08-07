@@ -29,6 +29,8 @@
 #define BROWSER_MAXFN_CNT     (16*1024)
 #define RECENT_MAXFN_CNT          (200)
 
+#define MAX_BACKUP_CNT             16
+
 #define SUPERFW_DIR               "/.superfw"
 #define ROMCONFIG_PATH            "/.superfw/config/"
 #define PATCHDB_PATH              "/.superfw/patches/"

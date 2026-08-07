@@ -155,8 +155,14 @@ void load_ingame_menu(
   for (unsigned i = 0; i < sizeof(igm->menu_palette) / sizeof(igm->menu_palette[0]); i++)
     igm->menu_palette[i] = MEM_PALETTE[ING_PALETTE_BASE + i];
 
-  if (savefn)
-    memcpy32(igm->savefile_pattern, savefn, sizeof(igm->savefile_pattern));
+  // Calculate the basename, so we can produce proper sav/backup files
+  // Only used if saving is enabled and DirSav is disabled.
+  if (savefn && !useds) {
+    char save_basename[MAX_FN_LEN];
+    strcpy(save_basename, savefn);
+    replace_extension(save_basename, "");
+    memcpy32(igm->savefile_pattern, save_basename, sizeof(igm->savefile_pattern));
+  }
   else
     memset32(igm->savefile_pattern, 0, sizeof(igm->savefile_pattern));
 
@@ -206,6 +212,7 @@ unsigned preload_gba_rom(const char *fn, uint32_t fs, t_rom_header *romh) {
 NOINLINE
 unsigned load_gba_rom(
   const char *fn, uint32_t fs,
+  const char *savefn,
   const t_patch *ptch,
   const t_dirsave_info *dsinfo,
   bool ingame_menu,
@@ -257,16 +264,7 @@ unsigned load_gba_rom(
   if (ingame_menu) {
     char sfn[MAX_FN_LEN];
     savestate_filename_calc(fn, sfn);
-    if (dsinfo) {
-      // If DirSave is enabled, we disable the menu save facilities.
-      load_ingame_menu(igm_addr, igm_space, true, NULL, sfn, use_rtc_patches, cheats);
-    } else {
-      // Calculate the basename, so we can produce proper sav/backup files
-      char save_basename[MAX_FN_LEN];
-      sram_template_filename_calc(fn, "", save_basename);
-
-      load_ingame_menu(igm_addr, igm_space, false, save_basename, sfn, use_rtc_patches, cheats);
-    }
+    load_ingame_menu(igm_addr, igm_space, dsinfo, savefn, sfn, use_rtc_patches, cheats);
   }
 
   // Proceed to load the ROM
@@ -449,7 +447,7 @@ unsigned flash_gba_nor(
       }
     }
 
-    // Go ahead and erase the blocks, then program them.
+    // Write flash blocks.
     for (uint32_t offset = 0; offset < ssize && offset + bigoff < fs; offset += flashinfo.blksize) {
       uint32_t absoff = offset + bigoff;
       uint32_t flashaddr = GBA_ROM_BASE_WS1 + absoff;
@@ -457,7 +455,13 @@ unsigned flash_gba_nor(
         progress((bigoff + ssize / 4 + offset * 3/4) >> 8, fs >> 8);
 
       unsigned toflash = MIN(flashinfo.blksize, fs - absoff);
-      if (!flash_program_buffered(flashaddr, &scratch[offset], toflash, flashinfo.blkwrite)) {
+      bool wr_ok = flash_program_buffered(flashaddr, &scratch[offset], toflash, flashinfo.blkwrite);
+
+      // Check the written block if so configured
+      if (wr_ok && use_verify_nor)
+        wr_ok = flash_verify(flashaddr, &scratch[offset], toflash);
+
+      if (!wr_ok) {
         f_close(&fd);
         reset_superchis_normap();
         return ERR_FLASH_OP;
@@ -471,7 +475,7 @@ unsigned flash_gba_nor(
 
 NOINLINE
 unsigned launch_gba_nor(
-  const char *romfn,
+  const char *romfn, const char *savefn,
   const uint8_t *normap, unsigned blkcnts,
   const t_dirsave_info *dsinfo,
   const t_rtc_info *rtcinfo,
@@ -490,16 +494,7 @@ unsigned launch_gba_nor(
   if (ingame_menu) {
     char sfn[MAX_FN_LEN];
     savestate_filename_calc(romfn, sfn);
-    if (dsinfo) {
-      // If DirSave is enabled, we disable the menu save facilities.
-      load_ingame_menu(igm_addr, igm_space, true, NULL, sfn, use_rtc_patches, cheats);
-    } else {
-      // Calculate the basename, so we can produce proper sav/backup files
-      char save_basename[MAX_FN_LEN];
-      sram_template_filename_calc(romfn, "", save_basename);
-
-      load_ingame_menu(igm_addr, igm_space, false, save_basename, sfn, use_rtc_patches, cheats);
-    }
+    load_ingame_menu(igm_addr, igm_space, dsinfo, savefn, sfn, use_rtc_patches, cheats);
   }
 
   if (dsinfo)
