@@ -1646,7 +1646,10 @@ void render_gba_norload(volatile uint8_t *frame) {
   const t_flash_game_entry *e = spop.p.norld.e;
   if (spop.submenu == GbaLoadPopInfo) {
     int save_type = GET_GATTR_SAVEM(e->gattrs);
-    render_gbarom_info(frame, e->game_name, false, (const char*)&e->gamecode, e->gamever, save_type);
+    char gcode[5] = {
+      e->gamecode & 0xFF, (e->gamecode >> 8) & 0xFF, (e->gamecode >> 16) & 0xFF, e->gamecode >> 24, 0
+    };
+    render_gbarom_info(frame, e->game_name, false, gcode, e->gamever, save_type);
     draw_central_text(msgs[lang_id][MSG_NOR_LAUNCH], frame, 120, 134);
   } else {
     bool rtc_patching = e->gattrs & GATTR_RTC;
