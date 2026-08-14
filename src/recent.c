@@ -80,9 +80,9 @@ NOINLINE unsigned insert_recent_fn(t_rentry *rentries, unsigned rcount, const ch
       // Found a matching file, move it to position 0, unless it's there already.
       if (i) {
         t_rentry tmp;
-        dma_memcpy16(&tmp, &rentries[i], sizeof(tmp) / 2);   // Copy entry to tmp
+        memcpy32(&tmp, &rentries[i], sizeof(tmp));   // Copy entry to tmp
         memmove32(&rentries[1], &rentries[0], i * sizeof(rentries[0]));
-        dma_memcpy16(&rentries[0], &tmp, sizeof(tmp) / 2);
+        memcpy32(&rentries[0], &tmp, sizeof(tmp));
       }
       return rcount;
     }
@@ -97,7 +97,7 @@ NOINLINE unsigned insert_recent_fn(t_rentry *rentries, unsigned rcount, const ch
   const char *pbn = file_basename(fn);
   rentries[0].fname_offset = pbn - fn;
   rentries[0].flags = flags;
-  dma_memcpy16(rentries[0].fpath, fn, (strlen(fn) + 1 + 1) / 2);
+  memcpy32(rentries[0].fpath, fn, strlen(fn) + 1);
   return rcount + 1;
 }
 
