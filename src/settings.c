@@ -55,6 +55,12 @@ const char *savestates_paths[] = {
   "/SAVESTATE/",
 };
 
+const char *initial_paths[] = {
+  "/",
+  "/ROMs/",
+  "/Games/"
+};
+
 const uint8_t animspd_lut[] = {
   2,    //  8 pix/second
   3,    // 12 pix/second
@@ -69,6 +75,10 @@ uint32_t lang_id = 0;
 uint32_t recent_menu = 1;
 uint32_t hide_hidden = 0;
 uint32_t anim_speed = animspd_cnt / 2;
+
+uint32_t initial_path = 0;
+
+bool quick_launch = false;
 
 // Default settings
 t_patch_policy patcher_default = PatchAuto;
@@ -113,8 +123,10 @@ bool save_ui_settings() {
     "langcode=%c%c\n"
     "recent_menu=%lu\n"
     "anim_speed=%lu\n"
-    "hide_hidden=%lu\n",
-    menu_theme, (lc & 0xFF), (lc >> 8), recent_menu, anim_speed, hide_hidden);
+    "hide_hidden=%lu\n"
+    "quick_launch=%i\n"
+    "initial_path=%lu\n",
+    menu_theme, (lc & 0xFF), (lc >> 8), recent_menu, anim_speed, hide_hidden, quick_launch, initial_path );
 
   UINT wrbytes;
   FRESULT res = f_write(&fd, buf, strlen(buf), &wrbytes);
@@ -153,7 +165,8 @@ bool save_settings() {
     "default_loadgame=%lu\n"
     "default_savegame=%lu\n"
     "prefer_directsave=%lu\n",
-    hotkey_combo, boot_bios_splash, save_path_default, state_path_default,
+    hotkey_combo, boot_bios_splash,
+    save_path_default, state_path_default,
     backup_sram_default, enable_cheats, use_slowld, use_fastew,
     (unsigned int)patcher_default, ingamemenu_default, rtcpatch_default,
     rtcvalue_default, rtcspeed_default, autoload_default, autosave_default,
@@ -182,6 +195,7 @@ static void parse_settings(void *usr, const char *var, const char *value) {
     rtcvalue_default = valu;
   else if (!strcmp(var, "default_rtctick"))
     rtcspeed_default = valu;
+
   else {
     const struct {
       const char *s;
@@ -215,10 +229,15 @@ static void parse_ui_settings(void *usr, const char *var, const char *value) {
     hide_hidden = valu;
   else if (!strcmp(var, "anim_speed"))
     anim_speed = valu;
+  else if (!strcmp(var, "quick_launch"))
+    quick_launch= valu;
+  else if (!strcmp(var, "initial_path"))
+    initial_path = valu % InitDirCNT;
   else if (!strcmp(var, "langcode")) {
     uint16_t code = ((uint8_t)value[0]) | (((uint8_t)value[1]) << 8);
     lang_id = lang_lookup(code);
   }
+
 }
 
 static void parse_file(char *buf, void(*parse_cb)(void *usr, const char*, const char*), void *usrptr) {

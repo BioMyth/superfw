@@ -92,6 +92,10 @@ enum {
 #define FLASH_UNLOCK_KEYS      (KEY_BUTTDOWN|KEY_BUTTB|KEY_BUTTSTA)
 #define FLASH_GO_KEYS          (KEY_BUTTUP|KEY_BUTTL|KEY_BUTTR)
 
+#define RECOVERY_FW_FILEPATH    "/recover.fw"
+
+#define INITIAL_BROWSER_PATH    "/Games/"
+
 #define INITIAL_KEY_REPEAT_FRAMES 15
 
 #define MIN_KEY_REPEAT_FRAMES 5
@@ -103,7 +107,10 @@ enum {
   UiSetASpd  = 3,
   UiSetHid   = 4,
   UiSetSave  = 5,
-  UiSetMAX   = 5,
+  UiSetMax   = 5
+  //UiSetPath  = 6,
+  //UiSetQuick = 7,
+  //UiSetMAX   = 7,
 };
 
 enum {
@@ -414,7 +421,8 @@ typedef struct {
   uint32_t tn;
 } t_oamobj;
 
-static bool enable_flashing = false;
+static bool enable_flashing = true;
+// false;
 static unsigned framen = 0;
 static unsigned objnum = 0;
 static t_oamobj fobjs[64];
@@ -424,6 +432,69 @@ static uint32_t hold_frame_count = 0;
 static uint32_t hold_frame_repeat = INITIAL_KEY_REPEAT_FRAMES;
 
 static bool is_repeating = false;
+
+static char start_dir[24];
+
+// Emergency recovery via a fw file at the start if it runs at all.
+// Helps w/my ui rework, not going to help w/corruption
+bool flash_recover() {
+  // We read the file into SDRAM, apply the update from there.
+  FIL fd;
+  FILINFO info;
+  FRESULT res = f_stat(RECOVERY_FW_FILEPATH, &info);
+  unsigned fwsize;
+  
+  if (res != FR_OK)
+    return false;
+  else
+   fwsize = info.fsize;
+  
+  res = f_open(&fd, RECOVERY_FW_FILEPATH, FA_READ);
+  if (res != FR_OK)
+    return false; // No emergency fw file to flash
+  else {
+    // Loading file...
+    for (unsigned i = 0; i < fwsize; i += 4*1024) {
+      UINT rdbytes;
+      unsigned tord = fwsize >= i + 4*1024 ? 4*1024 : fwsize - i;
+      uint32_t tmp[1024];
+      if (FR_OK != f_read(&fd, tmp, tord, &rdbytes) || rdbytes != tord) {
+        return false;
+      }
+      // Copy (ensure aligned copy!)
+      dma_memcpy32(&sdr_state->scratch[i], tmp, 1024);
+    }
+    // Now proceed to validate the superfw if necessary.
+    if (!validate_superfw_variant(sdr_state->scratch))
+      return false;
+    else if (!validate_superfw_checksum(sdr_state->scratch, fwsize))
+      return false;
+    else {
+      // Can start the flashing!
+      bool erased_ok;
+      #ifdef SUPPORT_NORGAMES
+      if (flashinfo.blksize)
+        erased_ok = flash_erase_sectors(ROM_FLASHFIRMW_ADDR, flashinfo.blksize,
+                                        (fwsize + flashinfo.blksize - 1) / flashinfo.blksize);
+      else
+      #endif
+        erased_ok = flash_erase_chip();
+
+      if (!erased_ok)
+        return false;
+      else {
+        bool programmed_ok;
+        #ifdef SUPPORT_NORGAMES
+        if (flashinfo.size && flashinfo.blksize && flashinfo.blkcount && flashinfo.blkwrite)
+          programmed_ok = flash_program_buffered(ROM_FLASHFIRMW_ADDR, sdr_state->scratch, fwsize, flashinfo.blkwrite);
+        else
+        #endif
+          programmed_ok = flash_program(ROM_FLASHFIRMW_ADDR, sdr_state->scratch, fwsize);
+        return programmed_ok;
+      }
+    }
+  }
+}
 
 unsigned lang_lookup(uint16_t code) {
   for (unsigned i = 0; i < LANG_COUNT; i++)
@@ -1235,7 +1306,7 @@ static void flashbrowser_reload() {
   #endif
 }
 
-static inline void render_icon(unsigned x, unsigned y, unsigned iconn) {
+static inline void render_icon(unsigned x, unsigned y, unsigned iconn) {  
   fobjs[objnum++] = (t_oamobj){
       y | 0x2000,     // Use 256 entries palette
       x | 0x4000,     // Size 16x16
@@ -1817,6 +1888,13 @@ void render_rtcpop(volatile uint8_t *frame) {
   draw_central_text("⯆", frame, cox[spop.rtcpop.selector], 84);
 }
 
+typedef enum {
+  TITLE = 0x00001,
+  HOTKEY = 0x00002,
+
+} SETTINGS_MASK;
+
+
 void render_settings(volatile uint8_t *frame) {
   char tmp[80];
   unsigned baseopt = smenu.set.selector <= 2  ? 0 :
@@ -1973,33 +2051,60 @@ void render_settings(volatile uint8_t *frame) {
       render_icon_trans(i, offy + (smenu.set.selector - baseopt) * 20, 63);
 }
 
+inline static bool should_render_setting(int selector, unsigned int option) {
+  return selector - 2 <= option && selector + 2 >= option;
+}
+
+inline static void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t *optcnt) {
+    const unsigned rowh = 20;
+    draw_text_ovf(title, frame, 8, 22 + rowh * (*optcnt), 224);
+    draw_central_text(value, frame, 170, 22 + rowh * (*optcnt));
+    (*optcnt) += 1;
+}
+
 void render_ui_settings(volatile uint8_t *frame) {
-  const unsigned colx = 170;
   char tmpbuf[64];
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %lu >", menu_theme + 1U);
-  draw_text_ovf(msgs[lang_id][MSG_UIS_THEME], frame, 8, 22, 224);
-  draw_central_text(tmpbuf, frame, colx, 22 );
 
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_LANG_NAME]);
-  draw_text_ovf(msgs[lang_id][MSG_UIS_LANG], frame, 8, 22 + 20, 224);
-  draw_central_text(tmpbuf, frame, colx, 22 + 20 );
+  if (smenu.uiset.selector > 2)
+    draw_central_text("⯅", frame, 120, 15);
+  if (smenu.uiset.selector < SettSave - 2)
+    draw_central_text("⯆", frame, 120, 125);
 
-  draw_text_ovf(msgs[lang_id][MSG_UIS_RECNT], frame, 8, 22 + 40, 224);
-  draw_central_text(msgs[lang_id][recent_menu ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], frame, colx, 22 + 40 );
+  uint16_t optcnt = 0;
 
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_UIS_SPD0 + anim_speed]);
-  draw_text_ovf(msgs[lang_id][MSG_UIS_ANSPD], frame, 8, 22 + 60, 224);
-  draw_central_text(tmpbuf, frame, colx, 22 + 60 );
-
-  draw_text_ovf(msgs[lang_id][MSG_UIS_BHID], frame, 8, 22 + 80, 224);
-  draw_central_text(msgs[lang_id][hide_hidden ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED], frame, colx, 22 + 80 );
-
+  if (should_render_setting(smenu.uiset.selector, UiSetTheme)) {
+    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %lu >", menu_theme + 1U);
+    render_setting_row(frame, msgs[lang_id][MSG_UIS_THEME], tmpbuf, &optcnt);
+  }
+  if (should_render_setting(smenu.uiset.selector, UiSetLang)){
+    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_LANG_NAME]);
+    render_setting_row(frame, msgs[lang_id][MSG_UIS_LANG], tmpbuf, &optcnt);
+  }
+  if (should_render_setting(smenu.uiset.selector, UiSetRect)){
+    render_setting_row(frame, msgs[lang_id][MSG_UIS_RECNT], msgs[lang_id][recent_menu ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], &optcnt);
+  }
+  if (should_render_setting(smenu.uiset.selector, UiSetASpd)){
+    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_UIS_SPD0 + anim_speed]);
+    render_setting_row(frame, msgs[lang_id][MSG_UIS_ANSPD], tmpbuf, &optcnt);
+  }
+  if (should_render_setting(smenu.uiset.selector, UiSetHid)){
+    render_setting_row(frame, msgs[lang_id][MSG_UIS_BHID], msgs[lang_id][hide_hidden ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED], &optcnt);
+  }
+  // if (should_render_setting(UiSetPath)) {
+  //   npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", initial_paths[initial_path]);
+  //   render_setting_row(frame, msgs[lang_id][MSG_UIS_INIT_PATH], tmpbuf, &optcnt);
+  // }
+  // if (should_render_setting(UiSetQuick)) {
+  //   render_setting_row(frame, msgs[lang_id][MSG_UIS_BHID], msgs[lang_id][quick_launch? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], &optcnt);
+  // }
   if (smenu.uiset.selector != UiSetSave)
     for (unsigned i = 0; i < 240; i += 16)
       render_icon_trans(i, 22 + smenu.uiset.selector * 20, 63);
 
-  draw_button_box(frame, 20, 220, 132, 152, smenu.uiset.selector == UiSetSave);
-  draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
+  if (should_render_setting(smenu.uiset.selector, UiSetSave)){
+    draw_button_box(frame, 20, 220, 132, 152, smenu.uiset.selector == UiSetSave);
+    draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
+  }
 }
 
 void render_info(volatile uint8_t *frame) {
@@ -2172,7 +2277,11 @@ void menu_init(int sram_testres) {
   memset(&spop, 0, sizeof(spop));
 
   // Reset the file browser as well.
-  strcpy(smenu.browser.cpath, "/");
+  strcpy(smenu.browser.cpath, INITIAL_BROWSER_PATH);
+  if (!check_file_exists(smenu.browser.cpath)){
+    strcpy(smenu.browser.cpath, "/");
+  }
+  strcpy(start_dir, smenu.browser.cpath);
   browser_reload();
   flashbrowser_reload();
 
@@ -2293,6 +2402,49 @@ void start_flash_update(const char *fn, unsigned fwsize, bool validate_superfw) 
     }
     spop.pop_num = 0;
   }
+}
+
+static void load_rom() {
+    // Insert the ROM into the recent list (or move it around). Flush to disk!
+  if (recent_menu)
+    insert_recent_flush(spop.p.load.i.romfn);
+
+  // Honor load.patch_type.
+  const t_patch *p = get_game_patch(&spop.p.load.i);
+  EnumSavetype st = p ? p->save_mode : SaveTypeNone;
+
+  // Prepare the savegame (load and store stuff, directsave...)
+  t_dirsave_info dsinfo;
+  unsigned errsave = prepare_savegame(
+    spop.p.load.l.sram_load_type, spop.p.load.l.sram_save_type,
+    st, &dsinfo, spop.p.load.l.savefn);
+  if (errsave) {
+    unsigned errmsg = (errsave == ERR_SAVE_BADSAVE)   ? MSG_ERR_SAVERD :
+                      (errsave == ERR_SAVE_CANTALLOC) ? MSG_ERR_SAVEPR :
+                      (errsave == ERR_SAVE_BADARG)    ? MSG_ERR_SAVEIT :
+                                                        MSG_ERR_SAVEWR;
+    spop.alert_msg = msgs[lang_id][errmsg];
+    return;
+  }
+
+  t_rtc_info rtci = {
+    .timestamp = spop.p.load.l.rtcval,
+    .ts_step = rtcspeed_default
+  };
+
+  unsigned err = load_gba_rom(
+    spop.p.load.i.romfn, spop.p.load.i.romfs, p,
+    spop.p.load.l.sram_save_type == SaveDirect ? &dsinfo : NULL,
+    spop.p.load.i.ingame_menu_enabled,
+    spop.p.load.i.rtc_patch_enabled ? &rtci : NULL,
+    spop.p.load.l.use_cheats ? spop.p.load.l.cheats_size : 0,
+    loadrom_progress);
+  if (err) {
+    // Show any errors that might have happened!
+    spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
+    // TODO: We cannot (in many cases) continue since we trash the SDRAM!
+  }
+    
 }
 
 static void keypress_popup_loadgba(unsigned newkeys, uint16_t keypresses) {
@@ -2923,9 +3075,10 @@ static void keypress_menu_browse(unsigned newkeys, uint16_t keypresses) {
       t_centry *e = sdr_state->fileorder[smenu.browser.selector];
       if (e->isdir) {
         strcat(smenu.browser.cpath, e->fname);
-        strcat(smenu.browser.cpath,
-          "/"
+        strcat(smenu.browser.cpath,  
+           start_dir      
         );
+        
         // Push selector history and reset it in the new dir
         memmove(&smenu.browser.selhist[1], &smenu.browser.selhist[0],
                 sizeof(smenu.browser.selhist) - sizeof(smenu.browser.selhist[0]));
@@ -2937,7 +3090,20 @@ static void keypress_menu_browse(unsigned newkeys, uint16_t keypresses) {
         strcpy(path, smenu.browser.cpath);
         strcat(path, e->fname);
         browser_open(path, e->filesize);
+        unsigned l = strlen(path);
+        // If FW file, then we don't want to load the rom by default, we should open menu
+        if (!strcasecmp(path[l-3], ".fw"))
+          load_rom();
       }
+    }
+    else if (newkeys & KEY_BUTTSTA) {
+        t_centry *e = sdr_state->fileorder[smenu.browser.selector];
+        if (!e->isdir) {
+          char path[MAX_FN_LEN];
+          strcpy(path, smenu.browser.cpath);
+          strcat(path, e->fname);
+          browser_open(path, e->filesize);
+        }
     }
     else if (newkeys & KEY_BUTTSEL) {
       // Shows a file management menu.
@@ -3038,10 +3204,18 @@ static void keypress_menu_norbrowse(unsigned newkeys, uint16_t keypresses) {
 #endif
 
 static void keypress_menu_settings(unsigned newkeys, uint16_t keypresses) {
-  if (newkeys & KEY_BUTTUP)
-    smenu.set.selector = MAX(0, smenu.set.selector - keypresses);
-  if (newkeys & KEY_BUTTDOWN)
+  if (newkeys & KEY_BUTTUP){
+    smenu.set.selector = MAX(1, smenu.set.selector - keypresses);
+    if (smenu.menu_tab == MENUTAB_SETTINGS && smenu.set.selector == SettTitle2){
+      smenu.set.selector = MAX(1, smenu.set.selector - 1);
+    }
+  }
+  if (newkeys & KEY_BUTTDOWN){
     smenu.set.selector = MIN(SettMAX, smenu.set.selector + keypresses);
+    if (smenu.menu_tab == MENUTAB_SETTINGS && (smenu.set.selector == SettTitle1 || smenu.set.selector == SettTitle2)){
+      smenu.set.selector = MIN(SettMAX, smenu.set.selector + 1);
+    }
+  }
   if (newkeys & KEY_BUTTLEFT) {
     if (smenu.set.selector == SettHotkey)
       hotkey_combo = (hotkey_combo + hotkey_listcnt - 1) % hotkey_listcnt;
@@ -3109,9 +3283,9 @@ static void keypress_menu_settings(unsigned newkeys, uint16_t keypresses) {
 
 static void keypress_menu_uisettings(unsigned newkeys, uint16_t keypresses) {
   if (newkeys & KEY_BUTTUP)
-    smenu.uiset.selector = MAX(0, smenu.uiset.selector - keypresses);
+    smenu.uiset.selector = MAX(0, smenu.uiset.selector - 1);//keypresses);
   if (newkeys & KEY_BUTTDOWN)
-    smenu.uiset.selector = MIN(UiSetMAX, smenu.uiset.selector + keypresses);
+    smenu.uiset.selector = MIN(UiSetMax, smenu.uiset.selector + 1 ); //keypresses);
   if (newkeys & KEY_BUTTLEFT) {
     if (smenu.uiset.selector == UiSetTheme)
       menu_theme = menu_theme ? menu_theme - 1 : 0;
@@ -3123,6 +3297,10 @@ static void keypress_menu_uisettings(unsigned newkeys, uint16_t keypresses) {
       recent_menu ^= 1;
     else if (smenu.uiset.selector == UiSetLang)
       lang_id = (lang_id + LANG_COUNT - 1) % LANG_COUNT;
+    // else if (smenu.uiset.selector == UiSetPath)
+    //   initial_path = initial_path ? initial_path - 1 : 0;
+    // else if (smenu.uiset.selector == UiSetQuick)
+    //   quick_launch ^= 1;
   }
   if (newkeys & KEY_BUTTRIGHT) {
     if (smenu.uiset.selector == UiSetTheme)
@@ -3135,6 +3313,10 @@ static void keypress_menu_uisettings(unsigned newkeys, uint16_t keypresses) {
       recent_menu ^= 1;
     else if (smenu.uiset.selector == UiSetLang)
       lang_id = (lang_id + 1) % LANG_COUNT;
+    // else if (smenu.uiset.selector == UiSetPath)
+    //   initial_path = MIN(initpath_cnt - 1, initial_path + 1);
+    // else if (smenu.uiset.selector == UiSetQuick)
+    //   quick_launch ^= 1;
   }
 
   if (newkeys & KEY_BUTTA && smenu.uiset.selector == UiSetSave) {
@@ -3235,6 +3417,7 @@ static void keypress_menu_info(unsigned newkeys, uint16_t keypresses) {
 }
 
 void menu_keypress(unsigned newkeys, uint16_t deltaframes) {
+  // TODO: Move this keypress code into a new function for maintainability
   bool repeat_key_held = (
     prev_keys == KEY_BUTTDOWN
     || prev_keys == KEY_BUTTUP

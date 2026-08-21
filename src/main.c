@@ -158,6 +158,8 @@ static int main_gba() {
   patchmem_dbinfo((uint8_t*)ROM_PATCHDB_U8, &pdbinfo.patch_count, pdbinfo.version, pdbinfo.date, pdbinfo.creator);
   set_supercard_mode(MAPPED_SDRAM, true, true);
 
+  if (flash_recover())
+    return 1;
   // Configure video mode so we can render the menu.
   setup_video();
 

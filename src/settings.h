@@ -36,10 +36,14 @@ extern const uint8_t animspd_lut[5];
 #define animspd_cnt (sizeof(animspd_lut)/sizeof(animspd_lut[0]))
 
 enum { SaveSavegameDir = 0, SaveSavesDir = 1, SaveRomName = 2, SaveDirCNT = 3 };
-enum { StateSavestateDir = 0, StateRomName = 1, StateDirCNT = 2 };
+enum { StateSavestateDir = 0, StateRomName = 1, StateDirCNT = 2, InitDirCNT = 3 };
 
 extern const char *save_paths[2];
 extern const char *savestates_paths[1];
+extern const char *initial_paths[3];
+
+#define initpath_cnt (sizeof(initial_paths)/sizeof(initial_paths[0]))
+
 
 // ROM loading and launching config settings
 typedef struct {
@@ -78,6 +82,10 @@ extern uint32_t ingamemenu_default;
 extern uint32_t rtcpatch_default;
 extern uint32_t rtcvalue_default;
 extern uint32_t rtcspeed_default;
+
+extern uint32_t initial_path;
+
+extern bool quick_launch;
 
 // Setting load/store
 bool save_ui_settings();

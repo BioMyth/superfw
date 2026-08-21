@@ -64,6 +64,7 @@ en_strings = [
   "MSG_SETT_FASTSD": "Fast ROM loading",
   "MSG_SETT_FASTEW": "EWRAM overclock",
 
+
   "MSG_TOOLS0_SDRAM": "SDRAM memory test",
   "MSG_TOOLS1_SRAM":  "SRAM memory test",
   "MSG_TOOLS2_BAT":   "SRAM battery test",
@@ -81,6 +82,8 @@ en_strings = [
   "MSG_UIS_ANSPD": "Text speed",
   "MSG_UIS_BHID":  "Show hidden files",
   "MSG_UIS_SAVE":  "Save to SD card",
+  "MSG_UIS_INIT_PATH": "Initial Path",
+  "MSG_UIS_QUICK_LAUNCH": "Quick Launch",
 
   "MSG_UIS_SPD0":  "Very slow",
   "MSG_UIS_SPD1":  "Slow",

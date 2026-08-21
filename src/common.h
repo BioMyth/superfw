@@ -226,6 +226,7 @@ void menu_init(int);    // Initializes meny system (ie. loading resources)
 void menu_render(unsigned fcnt);     // Renders the menu to the backframe
 void menu_keypress(unsigned newkeys, uint16_t deltaframes);   // Notifies key press
 void menu_flip();       // Swaps front and back buffer to show the last rendered frame.
+bool flash_recover();
 
 // Patching system
 typedef enum {
