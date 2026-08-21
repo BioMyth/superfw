@@ -106,13 +106,13 @@ enum {
   UiSetRect  = 2,
   UiSetASpd  = 3,
   UiSetHid   = 4,
-  UiSetSave  = 5,
+  UiSetQuick = 5,
   // UiSetMax   = 5
-  UiSetQuick = 6,
-  UiSetMax   = 6
   //UiSetPath  = 6,
   //UiSetQuick = 7,
   //UiSetMAX   = 7,
+  UiSetSave  = 6,
+  UiSetMax   = 6
 };
 
 enum {
@@ -2055,7 +2055,7 @@ void render_settings(volatile uint8_t *frame) {
 
 inline static bool should_render_setting(int selector, unsigned int option) {
   return (selector <= 3 && option <= 5)
-  || (selector - 2 <= option || selector + 2 >= option); 
+  || (selector - 2 <= option && selector + 2 >= option); 
 }
 
 inline static void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t *optcnt) {
@@ -2068,9 +2068,9 @@ inline static void render_setting_row(volatile uint8_t *frame, const char *title
 void render_ui_settings(volatile uint8_t *frame) {
   char tmpbuf[64];
 
-  if (smenu.uiset.selector > 2)
+  if (smenu.uiset.selector > 3)
     draw_central_text("⯅", frame, 120, 15);
-  if (smenu.uiset.selector < SettSave - 2 && SettMAX > 5)
+  if (smenu.uiset.selector < UiSetMax - 2 && UiSetMax > 5)
     draw_central_text("⯆", frame, 120, 125);
 
   uint16_t optcnt = 0;
@@ -2997,8 +2997,10 @@ static void keypress_menu_recent(unsigned newkeys, uint16_t keypresses) {
       if (res == FR_OK) {
         browser_open(e->fpath, info.fsize);
         int l = strlen(e->fpath);
+
         if (!strcasecmp(&e->fpath[l-3], ".gba") && newkeys & KEY_BUTTA)
           launch_gba_rom();
+
       } else {
         spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
       }
