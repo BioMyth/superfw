@@ -107,7 +107,9 @@ enum {
   UiSetASpd  = 3,
   UiSetHid   = 4,
   UiSetSave  = 5,
-  UiSetMax   = 5
+  // UiSetMax   = 5
+  UiSetQuick = 6,
+  UiSetMax   = 6
   //UiSetPath  = 6,
   //UiSetQuick = 7,
   //UiSetMAX   = 7,
@@ -2095,9 +2097,10 @@ void render_ui_settings(volatile uint8_t *frame) {
   //   npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", initial_paths[initial_path]);
   //   render_setting_row(frame, msgs[lang_id][MSG_UIS_INIT_PATH], tmpbuf, &optcnt);
   // }
-  // if (should_render_setting(UiSetQuick)) {
-  //   render_setting_row(frame, msgs[lang_id][MSG_UIS_BHID], msgs[lang_id][quick_launch? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], &optcnt);
-  // }
+  if (should_render_setting(smenu.uiset.selector, UiSetQuick)) {
+     render_setting_row(frame, msgs[lang_id][MSG_UIS_QUICK_LAUNCH], msgs[lang_id][quick_launch? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], &optcnt);
+  }
+  // Render the highlight bar?
   if (smenu.uiset.selector != UiSetSave)
     for (unsigned i = 0; i < 240; i += 16)
       render_icon_trans(i, 22 + smenu.uiset.selector * 20, 63);
