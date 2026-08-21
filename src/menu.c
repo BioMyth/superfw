@@ -2052,7 +2052,8 @@ void render_settings(volatile uint8_t *frame) {
 }
 
 inline static bool should_render_setting(int selector, unsigned int option) {
-  return selector - 2 <= option && selector + 2 >= option;
+  return (selector <= 3 && option <= 5)
+  || (selector - 2 <= option || selector + 2 >= option); 
 }
 
 inline static void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t *optcnt) {
@@ -2067,7 +2068,7 @@ void render_ui_settings(volatile uint8_t *frame) {
 
   if (smenu.uiset.selector > 2)
     draw_central_text("⯅", frame, 120, 15);
-  if (smenu.uiset.selector < SettSave - 2)
+  if (smenu.uiset.selector < SettSave - 2 && SettMAX > 5)
     draw_central_text("⯆", frame, 120, 125);
 
   uint16_t optcnt = 0;
@@ -3285,9 +3286,9 @@ static void keypress_menu_settings(unsigned newkeys, uint16_t keypresses) {
 
 static void keypress_menu_uisettings(unsigned newkeys, uint16_t keypresses) {
   if (newkeys & KEY_BUTTUP)
-    smenu.uiset.selector = MAX(0, smenu.uiset.selector - 1);//keypresses);
+    smenu.uiset.selector = MAX(0, smenu.uiset.selector - keypresses);
   if (newkeys & KEY_BUTTDOWN)
-    smenu.uiset.selector = MIN(UiSetMax, smenu.uiset.selector + 1 ); //keypresses);
+    smenu.uiset.selector = MIN(UiSetMax, smenu.uiset.selector + keypresses);
   if (newkeys & KEY_BUTTLEFT) {
     if (smenu.uiset.selector == UiSetTheme)
       menu_theme = menu_theme ? menu_theme - 1 : 0;
