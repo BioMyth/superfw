@@ -3092,7 +3092,7 @@ static void keypress_menu_browse(unsigned newkeys, uint16_t keypresses) {
         browser_open(path, e->filesize);
         unsigned l = strlen(path);
         // If FW file, then we don't want to load the rom by default, we should open menu
-        if (!strcasecmp(path[l-3], ".fw"))
+        if (!strcasecmp(&path[l-3], ".fw"))
           load_rom();
       }
     }
