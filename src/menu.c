@@ -2992,7 +2992,7 @@ static void keypress_menu_recent(unsigned newkeys, uint16_t keypresses) {
       FRESULT res = f_stat(e->fpath, &info);
       if (res == FR_OK) {
         browser_open(e->fpath, info.fsize);
-        int l = strlen(&e->fpath);
+        int l = strlen(e->fpath);
         if (!strcasecmp(&e->fpath[l-3], ".gba") && newkeys & KEY_BUTTA)
           launch_gba_rom();
       } else {
@@ -3041,7 +3041,7 @@ static void keypress_menu_browse(unsigned newkeys, uint16_t keypresses) {
       if (e->isdir) {
         strcat(smenu.browser.cpath, e->fname);
         strcat(smenu.browser.cpath,  
-           start_dir      
+           "/" 
         );
         
         // Push selector history and reset it in the new dir
