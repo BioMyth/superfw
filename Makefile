@@ -1,5 +1,5 @@
 
-VERSION_WORD := 0x00000014
+VERSION_WORD := 0x00000015
 VERSION_SLUG_WORD := $(shell git rev-parse --short=8 HEAD || echo FFFFFFFF)
 
 PREFIX		:= arm-none-eabi-
@@ -8,12 +8,12 @@ CXX		:= $(PREFIX)g++
 OBJDUMP		:= $(PREFIX)objdump
 OBJCOPY		:= $(PREFIX)objcopy
 
-COMPRESSION_RATIO ?= 4
+COMPRESSION_RATIO ?= 10
 
 GLOBAL_DEFINES = -D__GBA__
 
 # BOARD can be "sd", "lite", "chis"
-BOARD ?= sd
+BOARD ?= chis
 
 ifeq ($(BOARD),lite)
   GLOBAL_DEFINES += -DSUPERCARD_LITE_IO
@@ -154,9 +154,9 @@ INFILES=src/gba_ewram_crt0.S \
 all:	$(FWBINFILES) $(BIEMUFILES) directsave.payload ingame_trampoline.payload
 	# Wrap the firmware around a ROM->EWRAM loader
 	$(CC) $(CFLAGS) -o firmware.elf rom_boot.S -T ldscripts/gba_romboot.ld -nostartfiles -nostdlib -Wl,--defsym,MAX_FLASH_SIZE=$(MAXFSIZE)K
-	$(OBJCOPY) --output-target=binary firmware.elf superfw.gba
+	$(OBJCOPY) --output-target=binary firmware.elf superfw.fw
 	# Fix the header/checksum.
-	./tools/fw-fixer.py superfw.gba
+	./tools/fw-fixer.py superfw.fw
 
 firmware.ewram.gba: $(INFILES) ingamemenu.payload superfw.dldi.payload directsave.payload ingame_trampoline.payload src/messages_data.h ldscripts/gba_ewram.ld.i
 	# Build the actual firmware image

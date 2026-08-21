@@ -2404,7 +2404,8 @@ void start_flash_update(const char *fn, unsigned fwsize, bool validate_superfw) 
   }
 }
 
-static void load_rom() {
+
+static void launch_gba_rom() {
     // Insert the ROM into the recent list (or move it around). Flush to disk!
   if (recent_menu)
     insert_recent_flush(spop.p.load.i.romfn);
@@ -2444,7 +2445,6 @@ static void load_rom() {
     spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
     // TODO: We cannot (in many cases) continue since we trash the SDRAM!
   }
-    
 }
 
 static void keypress_popup_loadgba(unsigned newkeys, uint16_t keypresses) {
@@ -2604,45 +2604,7 @@ static void keypress_popup_loadgba(unsigned newkeys, uint16_t keypresses) {
       spop.alert_msg = msgs[lang_id][MSG_REMEMB_CFG_OK];
     }
     else if (GbaLoadPopInfo == spop.submenu) {
-      // Insert the ROM into the recent list (or move it around). Flush to disk!
-      if (recent_menu)
-        insert_recent_flush(spop.p.load.i.romfn);
-
-      // Honor load.patch_type.
-      const t_patch *p = get_game_patch(&spop.p.load.i);
-      EnumSavetype st = p ? p->save_mode : SaveTypeNone;
-
-      // Prepare the savegame (load and store stuff, directsave...)
-      t_dirsave_info dsinfo;
-      unsigned errsave = prepare_savegame(
-        spop.p.load.l.sram_load_type, spop.p.load.l.sram_save_type,
-        st, &dsinfo, spop.p.load.l.savefn);
-      if (errsave) {
-        unsigned errmsg = (errsave == ERR_SAVE_BADSAVE)   ? MSG_ERR_SAVERD :
-                          (errsave == ERR_SAVE_CANTALLOC) ? MSG_ERR_SAVEPR :
-                          (errsave == ERR_SAVE_BADARG)    ? MSG_ERR_SAVEIT :
-                                                            MSG_ERR_SAVEWR;
-        spop.alert_msg = msgs[lang_id][errmsg];
-        return;
-      }
-
-      t_rtc_info rtci = {
-        .timestamp = spop.p.load.l.rtcval,
-        .ts_step = rtcspeed_default
-      };
-
-      unsigned err = load_gba_rom(
-        spop.p.load.i.romfn, spop.p.load.i.romfs, p,
-        spop.p.load.l.sram_save_type == SaveDirect ? &dsinfo : NULL,
-        spop.p.load.i.ingame_menu_enabled,
-        spop.p.load.i.rtc_patch_enabled ? &rtci : NULL,
-        spop.p.load.l.use_cheats ? spop.p.load.l.cheats_size : 0,
-        loadrom_progress);
-      if (err) {
-        // Show any errors that might have happened!
-        spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
-        // TODO: We cannot (in many cases) continue since we trash the SDRAM!
-      }
+      launch_gba_rom();
     }
   }
 
@@ -3023,13 +2985,16 @@ static void keypress_menu_recent(unsigned newkeys, uint16_t keypresses) {
       smenu.recent.selector = MIN(smenu.recent.maxentries - 1, smenu.recent.selector + RECENT_ROWS * keypresses);
       smenu.recent.seloff   = MIN(smenu.recent.maxentries - 1, smenu.recent.seloff   + RECENT_ROWS * keypresses);
     }
-    if (newkeys & KEY_BUTTA) {
+    if (newkeys & KEY_BUTTA || newkeys & KEY_BUTTSTA) {
       t_rentry *e = &sdr_state->rentries[smenu.recent.selector];
       // stat() the file since we need the size, and validate that it exists!
       FILINFO info;
       FRESULT res = f_stat(e->fpath, &info);
       if (res == FR_OK) {
         browser_open(e->fpath, info.fsize);
+        int l = strlen(&e->fpath);
+        if (!strcasecmp(&e->fpath[l-3], ".gba") && newkeys & KEY_BUTTA)
+          launch_gba_rom();
       } else {
         spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
       }
@@ -3091,9 +3056,10 @@ static void keypress_menu_browse(unsigned newkeys, uint16_t keypresses) {
         strcat(path, e->fname);
         browser_open(path, e->filesize);
         unsigned l = strlen(path);
-        // If FW file, then we don't want to load the rom by default, we should open menu
-        if (!strcasecmp(&path[l-3], ".fw"))
-          load_rom();
+        // If GBA Rom then load
+        if (!strcasecmp(&path[l-3], ".gba"))
+          launch_gba_rom();
+        // TBD Add emu auto launch
       }
     }
     else if (newkeys & KEY_BUTTSTA) {
@@ -3146,7 +3112,7 @@ static void keypress_menu_norbrowse(unsigned newkeys, uint16_t keypresses) {
       smenu.fbrowser.seloff   = MIN(smenu.fbrowser.maxentries - 1, smenu.fbrowser.seloff   + NORGAMES_ROWS * keypresses);
     }
 
-    if (newkeys & KEY_BUTTA) {
+    if (newkeys & KEY_BUTTA || newkeys & KEY_BUTTSTA) {
       t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
 
       // Use attributes to determine patched save method.
@@ -3165,10 +3131,46 @@ static void keypress_menu_norbrowse(unsigned newkeys, uint16_t keypresses) {
       // Load and set default and sane settings honoring defaults and preferences.
       prepare_gba_settings(&spop.p.norld.l, game_uses_dsaving, lh_sett.rtcts, game_no_save, e->game_name);
 
-      // Show load ROM menu.
-      spop.pop_num = POPUP_GBA_NORLOAD;
-      spop.submenu = GbaLoadPopInfo;
-      spop.selector = 0;
+      if (newkeys & KEY_BUTTA){
+        const int stype = GET_GATTR_SAVEM(e->gattrs);
+        const EnumSavetype st = stype < 0 ? SaveTypeNone : stype;
+        bool uses_dsave = e->gattrs & GATTR_SAVEDS;
+        bool uses_igm   = e->gattrs & GATTR_IGM;
+        bool uses_rtc   = e->gattrs & GATTR_RTC;
+
+        t_dirsave_info dsinfo;
+        unsigned errsave = prepare_savegame(
+          spop.p.norld.l.sram_load_type, spop.p.norld.l.sram_save_type,
+          st, &dsinfo, spop.p.norld.l.savefn);
+        if (errsave) {
+          unsigned errmsg = (errsave == ERR_SAVE_BADSAVE)   ? MSG_ERR_SAVERD :
+                            (errsave == ERR_SAVE_CANTALLOC) ? MSG_ERR_SAVEPR :
+                            (errsave == ERR_SAVE_BADARG)    ? MSG_ERR_SAVEIT :
+                                                              MSG_ERR_SAVEWR;
+          spop.alert_msg = msgs[lang_id][errmsg];
+          return;
+        }
+        t_rtc_info rtci = {
+          .timestamp = spop.p.norld.l.rtcval,
+          .ts_step = rtcspeed_default
+        };
+
+        // TODO Handle errors, finish missing stuff.
+        unsigned err = launch_gba_nor(
+          e->game_name,
+          e->blkmap, e->numblks,
+          uses_dsave ? &dsinfo : NULL,
+          uses_rtc ? &rtci : NULL,
+          uses_igm,
+          spop.p.norld.l.use_cheats ? spop.p.norld.l.cheats_size : 0);
+      }
+      else if (newkeys & KEY_BUTTSTA){
+        // Show load ROM menu.
+        spop.pop_num = POPUP_GBA_NORLOAD;
+        spop.submenu = GbaLoadPopInfo;
+        spop.selector = 0;
+      }
+
     }
     else if (newkeys & KEY_BUTTSEL) {
       // Prompt NOR entry deletion.
