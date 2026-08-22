@@ -531,6 +531,9 @@ bool generate_patches_progress(const char *fn, unsigned fs) {
   f_close(&fd);
   patchengine_finalize(&pb);
 
+  WRITE_LOG("Patch engine done. Found wcnt: %d save: %d (save mode: %d) irqh: %d rtc: %d",
+            pb.p.wcnt_ops, pb.p.save_ops, pb.p.save_mode, pb.p.irqh_ops, pb.p.rtc_ops);
+
   // Proceed to write patches to their cache.
   return write_patches_cache(fn, &pb.p);
 }
@@ -691,10 +694,18 @@ static bool prepare_gba_info(
   info->patches_datab_found = patchmem_lookup(gamecode, (uint8_t*)ROM_PATCHDB_U8, &info->patches_datab);
   set_supercard_mode(MAPPED_SDRAM, true, true);
 
+  if (!info->patches_datab_found)
+    WRITE_LOG("No patches in PatchDB found for '%s' with gamecode %c%c%c%c-%d",
+              fn, gamecode[0], gamecode[1], gamecode[2], gamecode[3], (int)gamecode[4]);
+
   // Attempt to load any existing patch and check also the PE cache dir.
   info->patches_cache_found = load_rom_patches(fn, &info->patches_cache);
-  if (!info->patches_cache_found)
+  if (!info->patches_cache_found) {
+    WRITE_LOG("No patch file found for '%s'", fn);
     info->patches_cache_found = load_cached_patches(fn, &info->patches_cache);
+    if (!info->patches_cache_found)
+      WRITE_LOG("No patch file found in patches cache dir for '%s'", fn);
+  }
 
   // If PatchAuto is selected, resolve it. Downgrade if not found.
   if (st->patch_policy == PatchAuto) {
@@ -737,10 +748,12 @@ static void prepare_gba_cheats(const char *gcode, uint8_t ver, t_load_gba_lcfg *
     replace_extension(data->cheatsfn, ".cht");
     data->cheats_found = check_file_exists(data->cheatsfn);
     if (!data->cheats_found) {
+      WRITE_LOG("No cheat file found at '%s'", data->cheatsfn);
       // Create a path using the game ID and version.
       npf_snprintf(data->cheatsfn, sizeof(data->cheatsfn), CHEATS_PATH "%c%c%c%c-%02x.cht",
                    gcode[0], gcode[1], gcode[2], gcode[3], ver);
       data->cheats_found = check_file_exists(data->cheatsfn);
+      WRITE_LOG("No cheat file found at '%s'", data->cheatsfn);
 
       // Load the cheats into memory if enabled.
       if (data->cheats_found) {
@@ -752,6 +765,8 @@ static void prepare_gba_cheats(const char *gcode, uint8_t ver, t_load_gba_lcfg *
           data->cheats_found = false;
         else
           data->cheats_size = cheatsz;
+
+        WRITE_LOG("Loaded cheats returned %d", cheatsz);
       }
     }
   }
@@ -761,6 +776,10 @@ static void prepare_gba_cheats(const char *gcode, uint8_t ver, t_load_gba_lcfg *
 static void prepare_gba_settings(t_load_gba_lcfg *data, bool uses_dsaving, uint32_t rtcts, bool game_no_save) {
   // Calculate the .sav file name, and check its existance.
   data->savefile_found = check_file_exists(data->savefn);
+  if (data->savefile_found)
+    WRITE_LOG("Savefile found at '%s'", data->savefn);
+  else
+    WRITE_LOG("No savefile found for '%s'", data->savefn);
 
   // Use default settings (and file existance) to fill in default choice.
   // DirectSaving enabled overrides the other settings.
@@ -861,6 +880,9 @@ static void browser_open_nor(const t_flash_game_entry * e) {
 
   // Load and set default and sane settings honoring defaults and preferences.
   sram_filename_calc(e->game_name, spop.p.norld.l.savefn, save_path_nor_default);
+  WRITE_LOG("loadp: %d savep: %d uses_ds: %d gamens: %d",
+            spop.p.norld.l.sram_load_type, spop.p.norld.l.sram_save_type,
+            game_uses_dsaving, game_no_save);
   prepare_gba_settings(&spop.p.norld.l, game_uses_dsaving, lh_sett.rtcts, game_no_save);
 
   // Save entry pointer
@@ -1717,7 +1739,7 @@ void render_rtcpop(volatile uint8_t *frame) {
 }
 
 void render_settings(volatile uint8_t *frame) {
-  char tmp[80];
+  char tmp[128];
   unsigned baseopt = smenu.set.selector <= 2  ? 0 :
                      smenu.set.selector >= SettMAX - 3 ? SettMAX - 5 :
                      smenu.set.selector - 2;

@@ -39,6 +39,13 @@ endif
 
 FWBINFILES=firmware.ewram.gba res/patches.db res/fonts.pack
 
+ifeq ($(ENABLE_DISK_LOGGING),1)
+  PAYLOADFLAGS += -DENABLE_DISK_LOGGING
+endif
+ifeq ($(ENABLE_EMU_LOGGING),1)
+  PAYLOADFLAGS += -DENABLE_EMU_LOGGING
+endif
+
 ifeq ($(COMPRESS_FIRMWARE),1)
   GLOBAL_DEFINES += -DCOMPRESS_FONTS -DCOMPRESS_PATCHES -DCOMPRESS_FIRMWARE
   FWBINFILES := $(addsuffix .comp,$(FWBINFILES))
@@ -60,7 +67,7 @@ endif
 BASEFLAGS=$(GLOBAL_DEFINES) -mcpu=arm7tdmi -mtune=arm7tdmi
 
 CFLAGS=-O2 -ggdb \
-       $(BASEFLAGS) \
+       $(BASEFLAGS) $(PAYLOADFLAGS) \
        -DFW_MAX_SIZE_KB=$(MAXFSIZE) -DFW_FLAVOUR="\"$(FWFLAVOUR)\"" \
        -DSC_FAST_ROM_MIRROR="use_fast_mirror()" \
        -DSD_PREERASE_BLOCKS_WRITE \
@@ -120,6 +127,7 @@ MENUFILES=src/ingame.S \
 
 INFILES=src/gba_ewram_crt0.S \
         src/main.c \
+        src/log.c \
         src/cimpl.c \
         src/settings.c \
         src/loader.c \

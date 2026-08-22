@@ -29,6 +29,8 @@
 #pragma GCC optimize ("Os")
 
 NOINLINE bool recent_flush(const t_rentry *rentries, unsigned rcount) {
+  WRITE_LOG("Flushing recently played games (%d entries)", rcount);
+
   // Flush to disk!
   FIL fo;
   if (FR_OK != f_open(&fo, RECENT_FILEPATH, FA_WRITE | FA_CREATE_ALWAYS))
@@ -75,6 +77,8 @@ NOINLINE bool recent_flush(const t_rentry *rentries, unsigned rcount) {
 }
 
 NOINLINE unsigned insert_recent_fn(t_rentry *rentries, unsigned rcount, const char *fn, unsigned flags) {
+  WRITE_LOG("Adding/bumping recently played game: '%s' [%x]", fn, flags);
+
   for (unsigned i = 0; i < rcount; i++) {
     if (rentries[i].flags == flags && !strcmp(rentries[i].fpath, fn)) {
       // Found a matching file, move it to position 0, unless it's there already.
@@ -159,6 +163,8 @@ NOINLINE unsigned recent_load(const char *fpath, t_rentry *rentries) {
     memmove(&tmp[0], &tmp[cnt], bcount - cnt);
     bcount -= cnt;
   }
+
+  WRITE_LOG("Loaded recently played games. %d entries found", nentries);
 
   f_close(&fi);
   return nentries;
