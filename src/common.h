@@ -303,6 +303,9 @@ int sdbench_read(progress_abort_fn progcb);
 #elif defined(ENABLE_EMU_LOGGING)
   void write_log_emu(const char *fname, int line, const char *format, ...);
   #define WRITE_LOG(fmt, ...) write_log_emu(__FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#elif defined(ENABLE_UART_LOGGING)
+  void write_log_uart(const char *fname, int line, const char *format, ...);
+  #define WRITE_LOG(fmt, ...) write_log_uart(__FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #else
   #define WRITE_LOG(...) do {} while(0)
 #endif
