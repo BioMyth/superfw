@@ -2721,8 +2721,6 @@ static void keypress_popup_norload(unsigned newkeys, uint16_t keypresses) {
         .rtcts = spop.p.norld.l.rtcval
       };
 
-      const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
-
       // We load the loading settings to ensure we do not overwrite them.
       load_rom_settings(e->game_name, &ld_sett, NULL);
       save_rom_settings(e->game_name, &ld_sett, &lh_sett);
@@ -2851,7 +2849,7 @@ static void keypress_menu_recent(unsigned newkeys, uint16_t keypresses) {
       else
       #endif
       {
-      // stat() the file since we need the size, and validate that it exists!
+        // stat() the file since we need the size, and validate that it exists!
         FILINFO info;
         FRESULT res = f_stat(e->fpath, &info);
         if (res == FR_OK)
