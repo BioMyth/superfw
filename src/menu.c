@@ -2053,85 +2053,68 @@ void render_settings(volatile uint8_t *frame) {
       render_icon_trans(i, offy + (smenu.set.selector - baseopt) * 20, 63);
 }
 
-inline static bool should_render_setting(int selector, unsigned int option) {
-  return (selector <= 3 && option <= 5) ||
-  (UiSetMax - 5 <= selector && UiSetMax - 5 <= option )
-  || (selector - 2 <= option && MIN(selector + 2, UiSetMax) >= option); 
-}
-
-inline static void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t *optcnt) {
+void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t optcnt) {
     const unsigned rowh = 20;
-    draw_text_ovf(title, frame, 8, 22 + rowh * (*optcnt), 224);
-    draw_central_text(value, frame, 170, 22 + rowh * (*optcnt));
-    (*optcnt) += 1;
+    const unsigned offy = 29;
+    draw_text_ovf(title, frame, 8, offy + rowh * optcnt, 224);
+    draw_central_text(value, frame, 170, offy + rowh * optcnt);
 }
-
-inline void uisettheme(volatile uint8_t *frame, char * tmpbuf, uint16_t *optcnt) {
-    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %lu >", menu_theme + 1U);
-    render_setting_row(frame, msgs[lang_id][MSG_UIS_THEME], tmpbuf, &optcnt);
-} 
-
-typedef void (*render_row_func)(volatile uint8_t *frame, char * tmpbuf, uint16_t *optcnt);
-
-const static render_row_func ui_settings ={
-  &uisettheme,
-  
-}; 
-
 
 void render_ui_settings(volatile uint8_t *frame) {
   char tmpbuf[64];
-
+  const uint8_t rowCount = 6;
   if (smenu.uiset.selector > 3)
     draw_central_text("⯅", frame, 120, 15);
   if (smenu.uiset.selector < UiSetMax - 2 && UiSetMax > 5)
-    draw_central_text("⯆", frame, 120, 125);
+    draw_central_text("⯆", frame, 120, 15 + 20 * rowCount);//125);
 
-  uint16_t optcnt = 0;
-
-  if (should_render_setting(smenu.uiset.selector, UiSetTheme)) {
-    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %lu >", menu_theme + 1U);
-    render_setting_row(frame, msgs[lang_id][MSG_UIS_THEME], tmpbuf, &optcnt);
-  }
-  if (should_render_setting(smenu.uiset.selector, UiSetLang)){
-    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_LANG_NAME]);
-    render_setting_row(frame, msgs[lang_id][MSG_UIS_LANG], tmpbuf, &optcnt);
-  }
-  if (should_render_setting(smenu.uiset.selector, UiSetRect)){
-    render_setting_row(frame, msgs[lang_id][MSG_UIS_RECNT], msgs[lang_id][recent_menu ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], &optcnt);
-  }
-  if (should_render_setting(smenu.uiset.selector, UiSetASpd)){
-    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_UIS_SPD0 + anim_speed]);
-    render_setting_row(frame, msgs[lang_id][MSG_UIS_ANSPD], tmpbuf, &optcnt);
-  }
-  if (should_render_setting(smenu.uiset.selector, UiSetHid)){
-    render_setting_row(frame, msgs[lang_id][MSG_UIS_BHID], msgs[lang_id][hide_hidden ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED], &optcnt);
-  }
-  // if (should_render_setting(UiSetPath)) {
-  //   npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", initial_paths[initial_path]);
-  //   render_setting_row(frame, msgs[lang_id][MSG_UIS_INIT_PATH], tmpbuf, &optcnt);
-  // }
-  if (should_render_setting(smenu.uiset.selector, UiSetQuick)) {
-     render_setting_row(frame, msgs[lang_id][MSG_UIS_QUICK_LAUNCH], msgs[lang_id][quick_launch? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], &optcnt);
-  }
-  uint16_t baseopt = MAX(MIN(0, smenu.uiset.selector - 2), UiSetMax - 5);
-  for (size_t i = baseopt; i < (baseopt + 5); i++)
+  uint8_t baseopt = MIN(MAX(0, smenu.uiset.selector - 2), UiSetMax - rowCount);
+  // #pragma unroll rowCount
+  for (uint8_t i = 0; i < rowCount; i++)
   {
-    if (UiSetMax <= i )
+    switch (baseopt + i)
+    {
+    case UiSetTheme:
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %lu >", menu_theme + 1U);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_THEME], tmpbuf, i);
       break;
-    ui_settings[i](frame, tmpbuf, &optcnt);
+    case UiSetLang:
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_LANG_NAME]);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_LANG], tmpbuf, i);
+      break;
+    case UiSetRect:
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_RECNT], msgs[lang_id][recent_menu ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], i);
+      break;
+    case UiSetASpd:
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_UIS_SPD0 + anim_speed]);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_ANSPD], tmpbuf, i);
+      break;
+    case UiSetHid:
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_BHID], msgs[lang_id][hide_hidden ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED], i);
+      break;
+    case UiSetQuick:
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_QUICK_LAUNCH], msgs[lang_id][quick_launch? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], i);
+      break;
+    // case UiSetPath:
+    //   npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", initial_paths[initial_path]);
+    //   render_setting_row(frame, msgs[lang_id][MSG_UIS_INIT_PATH], tmpbuf, &optcnt);
+    //   break;
+
+    case UiSetSave:
+      draw_button_box(frame, 20, 220, 132, 152, smenu.uiset.selector == UiSetSave);
+      draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
+      break;
+    default:
+      break;
+    }
   }
-  
-  // Render the highlight bar?
+
+  // Render the highlight bar if not on save
   if (smenu.uiset.selector != UiSetSave)
     for (unsigned i = 0; i < 240; i += 16)
-      render_icon_trans(i, 22 + smenu.uiset.selector * 20, 63);
-
-  if (should_render_setting(smenu.uiset.selector, UiSetSave)){
-    draw_button_box(frame, 20, 220, 132, 152, smenu.uiset.selector == UiSetSave);
-    draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
-  }
+      render_icon_trans(i, 22 + (smenu.uiset.selector - baseopt) * 20, 63);
 }
+
 
 void render_info(volatile uint8_t *frame) {
   uint32_t vmaj = VERSION_WORD >> 16;
