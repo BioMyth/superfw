@@ -2604,7 +2604,7 @@ static void keypress_popup_norload(unsigned newkeys, uint16_t keypresses) {
   if (newkeys & KEY_BUTTDOWN)
     spop.selector = MIN(GBALdSetCNT - 1, spop.selector + keypresses);
 
-  const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
+  const t_flash_game_entry *e = spop.p.norld.e;
   bool uses_dsave = e->gattrs & GATTR_SAVEDS;
   bool uses_igm   = e->gattrs & GATTR_IGM;
   bool uses_rtc   = e->gattrs & GATTR_RTC;
@@ -2672,7 +2672,6 @@ static void keypress_popup_norload(unsigned newkeys, uint16_t keypresses) {
 
   if (newkeys & KEY_BUTTA) {
     if (spop.submenu == GbaLoadPopInfo) {
-      const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.selector];
       const int stype = GET_GATTR_SAVEM(e->gattrs);
       const EnumSavetype st = stype < 0 ? SaveTypeNone : stype;
       bool uses_dsave = e->gattrs & GATTR_SAVEDS;
@@ -2696,9 +2695,13 @@ static void keypress_popup_norload(unsigned newkeys, uint16_t keypresses) {
         .ts_step = rtcspeed_default
       };
 
+      if (recent_menu)
+        insert_recent_flush(e->game_name, FLAG_RECENT_NOR);
+
       // TODO Handle errors, finish missing stuff.
       unsigned err = launch_gba_nor(
         e->game_name,
+        spop.p.norld.l.sram_save_type == SaveDisable ? NULL : spop.p.norld.l.savefn,
         e->blkmap, e->numblks,
         uses_dsave ? &dsinfo : NULL,
         uses_rtc ? &rtci : NULL,
@@ -2849,12 +2852,12 @@ static void keypress_menu_recent(unsigned newkeys, uint16_t keypresses) {
       #endif
       {
       // stat() the file since we need the size, and validate that it exists!
-      FILINFO info;
-      FRESULT res = f_stat(e->fpath, &info);
+        FILINFO info;
+        FRESULT res = f_stat(e->fpath, &info);
         if (res == FR_OK)
-        browser_open(e->fpath, info.fsize);
+          browser_open(e->fpath, info.fsize);
         else
-        spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
+          spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
       }
     }
     else if (newkeys & KEY_BUTTSEL) {
@@ -2905,11 +2908,11 @@ static void keypress_menu_browse(unsigned newkeys, uint16_t keypresses) {
         smenu.browser.selector = 0;
         browser_reload();
       } else {
-          char path[MAX_FN_LEN];
-          strcpy(path, smenu.browser.cpath);
-          strcat(path, e->fname);
-          browser_open(path, e->filesize);
-        }
+        char path[MAX_FN_LEN];
+        strcpy(path, smenu.browser.cpath);
+        strcat(path, e->fname);
+        browser_open(path, e->filesize);
+      }
     }
     else if (newkeys & KEY_BUTTSEL) {
       // Shows a file management menu.
@@ -2989,7 +2992,9 @@ static void keypress_menu_norbrowse(unsigned newkeys, uint16_t keypresses) {
 
 static void keypress_menu_settings(unsigned newkeys, uint16_t keypresses) {
   if (newkeys & KEY_BUTTUP){
+    // Max 1 to skip the top option in the settings
     smenu.set.selector = MAX(1, smenu.set.selector - keypresses);
+    // Skip the title of the option section
     if (smenu.menu_tab == MENUTAB_SETTINGS && smenu.set.selector == SettTitle2){
       smenu.set.selector = MAX(1, smenu.set.selector - 1);
     }
