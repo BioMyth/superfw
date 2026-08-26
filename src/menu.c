@@ -1945,35 +1945,52 @@ void render_settings(volatile uint8_t *frame) {
       render_icon_trans(i, offy + (smenu.set.selector - baseopt) * 20, 63);
 }
 
+#define UI_ROW_COUNT 6
 void render_ui_settings(volatile uint8_t *frame) {
-  const unsigned colx = 170;
   char tmpbuf[64];
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %u >", menu_theme + 1U);
-  draw_text_ovf(msgs[lang_id][MSG_UIS_THEME], frame, 8, 22, 224);
-  draw_central_text(tmpbuf, frame, colx, 22 );
+  if (smenu.uiset.selector > 3)
+    draw_central_text("⯅", frame, 120, 15);
+  if (smenu.uiset.selector < UiSetMAX - 2 && UiSetMAX > 5)
+    draw_central_text("⯆", frame, 120, 15 + 20 * UI_ROW_COUNT);//125);
 
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_LANG_NAME]);
-  draw_text_ovf(msgs[lang_id][MSG_UIS_LANG], frame, 8, 22 + 20, 224);
-  draw_central_text(tmpbuf, frame, colx, 22 + 20 );
+  uint8_t baseopt = MIN(MAX(0, smenu.uiset.selector - 2), UiSetMAX - UI_ROW_COUNT);
+  #pragma GCC unroll rowCount
+  for (uint8_t i = 0; i < UI_ROW_COUNT; i++)
+  {
+    switch (baseopt + i)
+    {
+    case UiSetTheme:
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %lu >", menu_theme + 1U);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_THEME], tmpbuf, i);
+      break;
+    case UiSetLang:
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_LANG_NAME]);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_LANG], tmpbuf, i);
+      break;
+    case UiSetRect:
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_RECNT], msgs[lang_id][recent_menu ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], i);
+      break;
+    case UiSetASpd:
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_UIS_SPD0 + anim_speed]);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_ANSPD], tmpbuf, i);
+      break;
+    case UiSetHid:
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_BHID], msgs[lang_id][hide_hidden ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED], i);
+      break;
+    case UiSetSave:
+      draw_button_box(frame, 20, 220, 132, 152, smenu.uiset.selector == UiSetSave);
+      draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
+      break;
+    default:
+      break;
+    }
+  }
 
-  draw_text_ovf(msgs[lang_id][MSG_UIS_RECNT], frame, 8, 22 + 40, 224);
-  draw_central_text(msgs[lang_id][recent_menu ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], frame, colx, 22 + 40 );
-
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_UIS_SPD0 + anim_speed]);
-  draw_text_ovf(msgs[lang_id][MSG_UIS_ANSPD], frame, 8, 22 + 60, 224);
-  draw_central_text(tmpbuf, frame, colx, 22 + 60 );
-
-  draw_text_ovf(msgs[lang_id][MSG_UIS_BHID], frame, 8, 22 + 80, 224);
-  draw_central_text(msgs[lang_id][hide_hidden ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED], frame, colx, 22 + 80 );
-
+  // Render the highlight bar if not on save
   if (smenu.uiset.selector != UiSetSave)
     for (unsigned i = 0; i < 240; i += 16)
-      render_icon_trans(i, 22 + smenu.uiset.selector * 20, 63);
-
-  draw_button_box(frame, 20, 220, 132, 152, smenu.uiset.selector == UiSetSave);
-  draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
+      render_icon_trans(i, 22 + (smenu.uiset.selector - baseopt) * 20, 63);
 }
-
 void render_info(volatile uint8_t *frame) {
   uint32_t vmaj = VERSION_WORD >> 16;
   uint32_t vmin = VERSION_WORD & 0xFFFF;
