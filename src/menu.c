@@ -1962,7 +1962,7 @@ void render_ui_settings(volatile uint8_t *frame) {
     draw_central_text("⯆", frame, 120, 15 + 20 * UI_ROW_COUNT);//125);
 
   uint8_t baseopt = MIN(MAX(0, smenu.uiset.selector - 2), UiSetMAX - UI_ROW_COUNT);
-  #pragma GCC unroll 6
+
   for (uint8_t i = 0; i < UI_ROW_COUNT; i++)
   {
     switch (baseopt + i)
