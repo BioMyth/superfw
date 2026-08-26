@@ -312,3 +312,4 @@ int sdbench_read(progress_abort_fn progcb);
 
 #endif
 
+bool flash_recover();

@@ -1946,6 +1946,14 @@ void render_settings(volatile uint8_t *frame) {
 }
 
 #define UI_ROW_COUNT 6
+
+void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t optcnt) {
+    const unsigned rowh = 20;
+    const unsigned offy = 29;
+    draw_text_ovf(title, frame, 8, offy + rowh * optcnt, 224);
+    draw_central_text(value, frame, 170, offy + rowh * optcnt);
+}
+
 void render_ui_settings(volatile uint8_t *frame) {
   char tmpbuf[64];
   if (smenu.uiset.selector > 3)
@@ -1954,7 +1962,7 @@ void render_ui_settings(volatile uint8_t *frame) {
     draw_central_text("⯆", frame, 120, 15 + 20 * UI_ROW_COUNT);//125);
 
   uint8_t baseopt = MIN(MAX(0, smenu.uiset.selector - 2), UiSetMAX - UI_ROW_COUNT);
-  #pragma GCC unroll rowCount
+  #pragma GCC unroll 6
   for (uint8_t i = 0; i < UI_ROW_COUNT; i++)
   {
     switch (baseopt + i)
@@ -1991,6 +1999,7 @@ void render_ui_settings(volatile uint8_t *frame) {
     for (unsigned i = 0; i < 240; i += 16)
       render_icon_trans(i, 22 + (smenu.uiset.selector - baseopt) * 20, 63);
 }
+
 void render_info(volatile uint8_t *frame) {
   uint32_t vmaj = VERSION_WORD >> 16;
   uint32_t vmin = VERSION_WORD & 0xFFFF;
@@ -3373,5 +3382,68 @@ void menu_keypress(unsigned newkeys, uint16_t deltaframes) {
       keypress_menu_info,
     };
     keyfns[smenu.menu_tab](newkeys, keypresses);
+  }
+}
+
+#define RECOVERY_FW_FILEPATH    "/recover.fw"
+
+// Emergency recovery via a fw file at the start if it runs at all.
+// Helps w/my ui rework, not going to help w/corruption
+bool flash_recover() {
+  // We read the file into SDRAM, apply the update from there.
+  FIL fd;
+  FILINFO info;
+  FRESULT res = f_stat(RECOVERY_FW_FILEPATH, &info);
+  unsigned fwsize;
+  
+  if (res != FR_OK)
+    return false;
+  else
+   fwsize = info.fsize;
+  
+  res = f_open(&fd, RECOVERY_FW_FILEPATH, FA_READ);
+  if (res != FR_OK)
+    return false; // No emergency fw file to flash
+  else {
+    // Loading file...
+    for (unsigned i = 0; i < fwsize; i += 4*1024) {
+      UINT rdbytes;
+      unsigned tord = fwsize >= i + 4*1024 ? 4*1024 : fwsize - i;
+      uint32_t tmp[1024];
+      if (FR_OK != f_read(&fd, tmp, tord, &rdbytes) || rdbytes != tord) {
+        return false;
+      }
+      // Copy (ensure aligned copy!)
+      dma_memcpy32(&sdr_state->scratch[i], tmp, 1024);
+    }
+    // Now proceed to validate the superfw if necessary.
+    if (!validate_superfw_variant(sdr_state->scratch))
+      return false;
+    else if (!validate_superfw_checksum(sdr_state->scratch, fwsize))
+      return false;
+    else {
+      // Can start the flashing!
+      bool erased_ok;
+      #ifdef SUPPORT_NORGAMES
+      if (flashinfo.blksize)
+        erased_ok = flash_erase_sectors(ROM_FLASHFIRMW_ADDR, flashinfo.blksize,
+                                        (fwsize + flashinfo.blksize - 1) / flashinfo.blksize);
+      else
+      #endif
+        erased_ok = flash_erase_chip();
+
+      if (!erased_ok)
+        return false;
+      else {
+        bool programmed_ok;
+        #ifdef SUPPORT_NORGAMES
+        if (flashinfo.size && flashinfo.blksize && flashinfo.blkcount && flashinfo.blkwrite)
+          programmed_ok = flash_program_buffered(ROM_FLASHFIRMW_ADDR, sdr_state->scratch, fwsize, flashinfo.blkwrite);
+        else
+        #endif
+          programmed_ok = flash_program(ROM_FLASHFIRMW_ADDR, sdr_state->scratch, fwsize);
+        return programmed_ok;
+      }
+    }
   }
 }
