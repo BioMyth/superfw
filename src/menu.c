@@ -2054,8 +2054,9 @@ void render_settings(volatile uint8_t *frame) {
 }
 
 inline static bool should_render_setting(int selector, unsigned int option) {
-  return (selector <= 3 && option <= 5)
-  || (selector - 2 <= option && selector + 2 >= option); 
+  return (selector <= 3 && option <= 5) ||
+  (UiSetMax - 5 <= selector && UiSetMax - 5 <= option )
+  || (selector - 2 <= option && MIN(selector + 2, UiSetMax) >= option); 
 }
 
 inline static void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t *optcnt) {
@@ -2064,6 +2065,19 @@ inline static void render_setting_row(volatile uint8_t *frame, const char *title
     draw_central_text(value, frame, 170, 22 + rowh * (*optcnt));
     (*optcnt) += 1;
 }
+
+inline void uisettheme(volatile uint8_t *frame, char * tmpbuf, uint16_t *optcnt) {
+    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %lu >", menu_theme + 1U);
+    render_setting_row(frame, msgs[lang_id][MSG_UIS_THEME], tmpbuf, &optcnt);
+} 
+
+typedef void (*render_row_func)(volatile uint8_t *frame, char * tmpbuf, uint16_t *optcnt);
+
+const static render_row_func ui_settings ={
+  &uisettheme,
+  
+}; 
+
 
 void render_ui_settings(volatile uint8_t *frame) {
   char tmpbuf[64];
@@ -2100,6 +2114,14 @@ void render_ui_settings(volatile uint8_t *frame) {
   if (should_render_setting(smenu.uiset.selector, UiSetQuick)) {
      render_setting_row(frame, msgs[lang_id][MSG_UIS_QUICK_LAUNCH], msgs[lang_id][quick_launch? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], &optcnt);
   }
+  uint16_t baseopt = MAX(MIN(0, smenu.uiset.selector - 2), UiSetMax - 5);
+  for (size_t i = baseopt; i < (baseopt + 5); i++)
+  {
+    if (UiSetMax <= i )
+      break;
+    ui_settings[i](frame, tmpbuf, &optcnt);
+  }
+  
   // Render the highlight bar?
   if (smenu.uiset.selector != UiSetSave)
     for (unsigned i = 0; i < 240; i += 16)
