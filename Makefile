@@ -15,6 +15,8 @@ GLOBAL_DEFINES = -D__GBA__
 # BOARD can be "sd", "lite", "chis"
 BOARD ?= chis
 
+FIRMWARE_NAME = superfw-$(BOARD).fw
+
 ifeq ($(BOARD),lite)
   GLOBAL_DEFINES += -DSUPERCARD_LITE_IO
   COMPRESS_FIRMWARE = 1
@@ -36,8 +38,6 @@ else ifeq ($(BOARD),chis)
 else
   $(error No valid board specified in BOARD)
 endif
-
-FIRMWARE_NAME := "superfw-$(BOARD).fw"
 
 FWBINFILES=firmware.ewram.gba res/patches.db res/fonts.pack
 
