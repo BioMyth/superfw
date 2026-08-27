@@ -3358,3 +3358,66 @@ void menu_keypress(unsigned newkeys, uint16_t deltaframes) {
     keyfns[smenu.menu_tab](newkeys, keypresses);
   }
 }
+
+#define RECOVERY_FW_FILEPATH    "/recover.fw"
+
+// Emergency recovery via a fw file at the start if it runs at all.
+// Helps w/my ui rework, not going to help w/corruption
+bool flash_recover() {
+  // We read the file into SDRAM, apply the update from there.
+  FIL fd;
+  FILINFO info;
+  FRESULT res = f_stat(RECOVERY_FW_FILEPATH, &info);
+  unsigned fwsize;
+  
+  if (res != FR_OK)
+    return false;
+  else
+   fwsize = info.fsize;
+  
+  res = f_open(&fd, RECOVERY_FW_FILEPATH, FA_READ);
+  if (res != FR_OK)
+    return false; // No emergency fw file to flash
+  else {
+    // Loading file...
+    for (unsigned i = 0; i < fwsize; i += 4*1024) {
+      UINT rdbytes;
+      unsigned tord = fwsize >= i + 4*1024 ? 4*1024 : fwsize - i;
+      uint32_t tmp[1024];
+      if (FR_OK != f_read(&fd, tmp, tord, &rdbytes) || rdbytes != tord) {
+        return false;
+      }
+      // Copy (ensure aligned copy!)
+      dma_memcpy32(&sdr_state->scratch[i], tmp, 1024);
+    }
+    // Now proceed to validate the superfw if necessary.
+    if (!validate_superfw_variant(sdr_state->scratch))
+      return false;
+    else if (!validate_superfw_checksum(sdr_state->scratch, fwsize))
+      return false;
+    else {
+      // Can start the flashing!
+      bool erased_ok;
+      #ifdef SUPPORT_NORGAMES
+      if (flashinfo.blksize)
+        erased_ok = flash_erase_sectors(ROM_FLASHFIRMW_ADDR, flashinfo.blksize,
+                                        (fwsize + flashinfo.blksize - 1) / flashinfo.blksize);
+      else
+      #endif
+        erased_ok = flash_erase_chip();
+
+      if (!erased_ok)
+        return false;
+      else {
+        bool programmed_ok;
+        #ifdef SUPPORT_NORGAMES
+        if (flashinfo.size && flashinfo.blksize && flashinfo.blkcount && flashinfo.blkwrite)
+          programmed_ok = flash_program_buffered(ROM_FLASHFIRMW_ADDR, sdr_state->scratch, fwsize, flashinfo.blkwrite);
+        else
+        #endif
+          programmed_ok = flash_program(ROM_FLASHFIRMW_ADDR, sdr_state->scratch, fwsize);
+        return programmed_ok;
+      }
+    }
+  }
+}
