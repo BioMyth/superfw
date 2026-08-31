@@ -42,6 +42,10 @@
 #include "res/icons.h"
 #include "res/logo.h"
 
+#define NEW_RENDER_ENGINE
+#define ROW_COUNT 6
+
+
 extern t_card_info sd_info;
 extern bool fastew;
 extern bool slowsd;
@@ -415,7 +419,8 @@ typedef struct {
   unsigned tn;
 } t_oamobj;
 
-static bool enable_flashing = false;
+static bool enable_flashing = true;
+//false;
 static unsigned framen = 0;
 static unsigned objnum = 0;
 static t_oamobj fobjs[64];
@@ -1764,7 +1769,394 @@ void render_rtcpop(volatile uint8_t *frame) {
   draw_central_text("⯆", frame, cox[spop.rtcpop.selector], 84);
 }
 
+static inline void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t optcnt, uint8_t offy) {
+    const unsigned rowh = 20;
+    draw_text_ovf(title, frame, 8, offy + rowh * optcnt, 224);
+    draw_central_text(value, frame, 170, offy + rowh * optcnt);
+}
+
+#ifdef NEW_RENDER_ENGINE
+
+typedef enum {
+  Header,
+  RTC,
+  IntScroll,
+  TxtScroll,
+  ArrScroll,
+  Bool,
+  InvBool,
+  HotKey,
+  Callback,
+  Save
+} menuOptionType;
+
+typedef void (*menuoptioncallback)(char *tmpbuf);
+
+typedef struct menuoption {
+    /* Translation Id */
+  uint32_t name;
+  menuOptionType type;
+  /* Translation Id */
+  uint32_t baseOption;
+  uint8_t *selectedOption;
+  // bool animate;
+  menuoptioncallback callback;
+} menuoption;
+
+typedef struct menu {
+  int *selector;
+  uint16_t optionCount;
+  menuoption *options;
+  void (*helpCallback)(volatile uint8_t *frame);
+} menu;
+
+void renderMenu(volatile uint8_t *frame, const menu *menu) {
+  char tmpbuf[128];
+  uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
+  bool scroll = menu->optionCount >= numrows;
+
+  unsigned int rowh = 20;
+  
+  uint8_t offy = (scroll ? 29 : 22);
+
+  unsigned selector = *menu->selector;
+
+  if (scroll && selector > numrows/2)
+    draw_central_text("⯅", frame, 120, 15);
+  if (scroll && selector < menu->optionCount - numrows/2)
+    draw_central_text("⯆", frame, 120, 15 + 20 * numrows);//125);
+
+  uint8_t baseopt;
+  // If we are in the first half of the first page or there aren't enough rows to scroll
+  if (selector < numrows/2 || !scroll)
+    baseopt = 0;
+  // If we are in the second half of the last page
+  else if (menu->optionCount - selector < numrows/2) 
+    baseopt = menu->optionCount - numrows/2;
+  else 
+    baseopt = selector - numrows/2;
+
+  // npf_snprintf(tmpbuf, sizeof(tmpbuf), " %u ", baseopt);
+  // render_setting_row(frame, "baseopt", tmpbuf, 0);
+  
+  for (uint8_t offopt = 0; offopt < MIN(numrows, menu->optionCount); offopt++)
+  {
+      menuoption *selopt = &menu->options[baseopt + offopt];
+      switch (selopt->type)
+      {
+      case Header:
+        draw_central_text(msgs[lang_id][selopt->name], frame, SCREEN_WIDTH/2, offy + rowh*offopt);
+        break;
+      case TxtScroll:
+        npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", 
+          msgs[lang_id][selopt->baseOption + (selopt->selectedOption == NULL ? 0 : *selopt->selectedOption)]);
+          render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
+        break;
+      case IntScroll:
+        npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %i >", *((uint8_t*) selopt->selectedOption));
+        render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
+        break;
+      case Bool:
+        render_setting_row(frame, msgs[lang_id][selopt->name], 
+          msgs[lang_id][(selopt->baseOption ? selopt->baseOption : MSG_KNOB_DISABLED)+ *((bool *) selopt->selectedOption)],
+         // msgs[lang_id][(*((bool *) selopt->selectedOption) ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED)],
+           offopt, offy);
+        break;
+      case InvBool:
+        render_setting_row(frame, msgs[lang_id][selopt->name], 
+          msgs[lang_id][(selopt->baseOption ? selopt->baseOption : MSG_KNOB_DISABLED) + 1 - *((bool *) selopt->selectedOption)],
+          // msgs[lang_id][(*((bool *) selopt->selectedOption) ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED)],
+           offopt, offy);
+        break;
+      case Callback:
+        selopt->callback(tmpbuf);
+        render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
+        break;
+      case Save:
+        // draw_button_box(frame, 20, 220, 132, 152, selector == (baseopt + offopt));
+        draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
+        break;
+      default:
+        break;
+      }
+  }
+
+  // Render the highlight bar if not on save
+  // if (smenu.uiset.selector != UiSetSave)
+    // #pragma GCC unroll 15
+    for (unsigned i = 0; i < 15; i++)
+      render_icon_trans(i * 16, offy + (selector - baseopt) * rowh, 63);
+  if (menu->helpCallback != NULL)
+    menu->helpCallback(frame);
+}
+
+
+static void  rtcRenderCallback(char *tmpbuf){
+        t_dec_date d;
+        timestamp2date(rtcvalue_default, &d);
+        npf_snprintf(tmpbuf, sizeof(tmpbuf), "20%02d/%02d/%02d %02d:%02d",
+          d.year, d.month, d.day, d.hour, d.min);
+}
+
+static void rtcSpeedRenderCallback(char *tmpbuf) {
+  unsigned spdmsg = rtcspeed_default ? (MSG_UIS_SPD0 + rtcspeed_default - 1) : MSG_STILLRTC;
+  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][spdmsg]);
+}
+
+static void hotkeyRenderCallback(char *tmpbuf){
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", hotkey_list[hotkey_combo].cname);
+}
+
+static void savePathRenderCallback(char *tmpbuf){
+  if (save_path_default == SaveRomName)
+    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_NEXTTO_ROM]);
+  else
+    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", save_paths[save_path_default]);
+}
+
+static void savePathFlashRenderCallback(char *tmpbuf) {
+  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", save_paths[save_path_nor_default]);
+}
+
+static void saveStatePathRenderCallback(char *tmpbuf){
+  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", savestates_paths_display[state_path_default]);
+}
+
+
+
+static menuoption SetMenuOpts[] = {
+  {
+    MSG_SET_TITL1,
+    Header,
+    0,
+    NULL,
+    // false,
+    NULL
+  },
+  {
+    MSG_SETT_HOTK,
+    Callback,
+    0,
+    NULL,
+    // false,
+    hotkeyRenderCallback
+  },
+  {
+    MSG_SETT_BOOT,
+    TxtScroll,
+    MSG_BOOT_TYPE0,
+    &boot_bios_splash,
+    // false,
+    NULL
+  },
+  {
+    MSG_SETT_FASTSD,
+    InvBool,
+    0,
+    &use_slowld,
+    // false,
+    NULL
+  },
+  #ifdef SUPPORT_NORGAMES
+  {
+    MSG_SETT_VERNOR,
+    Bool,
+    0,
+    &use_verify_nor,
+    // false,
+    NULL
+  },
+  #endif
+  {
+    MSG_SETT_FASTEW,
+    Bool,
+    0,
+    &use_fastew,
+    // false,
+    NULL
+  },
+  {
+    MSG_SETT_SAVET,
+    Callback,
+    0,
+    NULL,
+    // false,
+    savePathRenderCallback
+  },
+  #ifdef SUPPORT_NORGAMES
+  {
+    MSG_SETT_SAVETX,
+    Callback,
+    0,
+    NULL,
+    // false,
+    savePathFlashRenderCallback
+  },
+  #endif
+  {
+    MSG_SETT_SAVEBK,
+    IntScroll,
+    0,
+    &backup_sram_default,
+    // false,
+    NULL
+  },
+  {
+    MSG_SETT_STATET,
+    Callback,
+    0,
+    NULL,
+    // false,
+    saveStatePathRenderCallback
+  },
+  {
+    MSG_SETT_CHTEN,
+    Bool,
+    0,
+    &enable_cheats,
+    // false,
+    NULL
+  },
+  {
+    MSG_SET_TITL2,
+    Header,
+    0,
+    NULL,
+    // false,
+    NULL
+  },
+  {
+    MSG_DEFS_PATCH,
+    TxtScroll,
+    MSG_PATCH_TYPE0,
+    &patcher_default,
+    // false,
+    NULL
+  },
+  {
+    MSG_LOADER_MENU,
+    Bool,
+    0,
+    &ingamemenu_default,
+    // false,
+    NULL
+  },
+  {
+    MSG_LOADER_RTCE,
+    Bool,
+    0,
+    &rtcpatch_default,
+    // false,
+    NULL
+  },
+  {
+    MSG_DEF_RTCVAL,
+    Callback,
+    0,
+    NULL,
+    // false,
+    rtcRenderCallback
+  },
+  {
+    MSG_DEF_SPEED,
+    Callback,
+    0,
+    NULL,
+    // false,
+    rtcSpeedRenderCallback
+  },
+  {
+    MSG_LOADER_LOADP,
+    InvBool,
+    MSG_DEF_LOADP0,
+    &autoload_default,
+    // false,
+    NULL
+  },
+  {
+    MSG_LOADER_SAVEP,
+    Bool,
+    MSG_DEF_SAVEP0,
+    &autosave_default,
+    // false,
+    NULL
+  },
+  {
+    MSG_LOADER_PREFDS,
+    Bool,
+    0,
+    &autosave_prefer_ds,
+    // false,
+    NULL
+  },
+  {
+    MSG_UIS_SAVE,
+    Save,
+    0,
+    NULL,
+    // false,
+    NULL
+  }
+};
+
+
+
+void uiSetRenderHelp(volatile uint8_t *frame) {
+  char tmp[128];
+  // Render bar below for help messge
+  dma_memset16(&frame[240*140], dup8(FG_COLOR), 240*20/2);
+
+  if (smenu.set.selector == SettSaveLoc) {
+    if (save_path_default == SaveRomName)
+      draw_text_ovf_rotate(msgs[lang_id][MSG_SAVE_TYPE_NR], frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+    else {
+      npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_SAVE_TYPE_PT], save_paths[save_path_default]);
+      draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+    }
+  }
+  else if (smenu.set.selector == SettStateLoc) {
+    npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_STATE_TYPE_PT], savestates_paths[state_path_default]);
+    draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+  }
+  #ifdef SUPPORT_NORGAMES
+  else if (smenu.set.selector == SettSaveLocNOR) {
+    npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_SAVE_TYPE_PTX], save_paths[save_path_nor_default]);
+    draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+  }
+  #endif
+  else {
+    unsigned help_msg = smenu.set.selector == SettBootType ? MSG_BOOT_TYPE_I0 + boot_bios_splash :
+                        smenu.set.selector == SettSaveBkp  ? MSG_BACKUP_I :
+                        smenu.set.selector == SettFastSD   ? MSG_FASTSD_I :
+                        smenu.set.selector == SettFastEWRAM? MSG_FASTEW_I :
+                        smenu.set.selector == DefsPatchEng ? MSG_PATCH_TYPE_I0 + patcher_default :
+                        smenu.set.selector == DefsLoadPol  ? MSG_DEF_LOADP_I0 + (autoload_default ^ 1) :
+                        smenu.set.selector == DefsSavePol  ? MSG_DEF_SAVEP_I0 + (autosave_default ^ 1) :
+                        smenu.set.selector == DefsPrefDS   ? MSG_LOADER_PREFDSI :
+                        #ifdef SUPPORT_NORGAMES
+                        smenu.set.selector == SettVerifyNOR ? MSG_VERNOR_I :
+                        #endif
+                        MSG_EMPTY;
+    draw_text_ovf_rotate(msgs[lang_id][help_msg], frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+  }
+}
+
+static const menu globalSetMenu = {
+      &smenu.set.selector,
+      SettMAX,
+      SetMenuOpts,
+      uiSetRenderHelp
+};
+
+
+#endif
+
+
 void render_settings(volatile uint8_t *frame) {
+  #ifdef NEW_RENDER_ENGINE
+  renderMenu(frame, &globalSetMenu);
+  #endif
+  #ifndef NEW_RENDER_ENGINE
   char tmp[128];
   unsigned baseopt = smenu.set.selector <= 2  ? 0 :
                      smenu.set.selector >= SettMAX - 3 ? SettMAX - 5 :
@@ -1943,47 +2335,122 @@ void render_settings(volatile uint8_t *frame) {
   if (smenu.set.selector != SettSave)
     for (unsigned i = 0; i < 240; i += 16)
       render_icon_trans(i, offy + (smenu.set.selector - baseopt) * 20, 63);
+  #endif
 }
 
-#define UI_ROW_COUNT 6
 
-void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t optcnt) {
-    const unsigned rowh = 20;
-    const unsigned offy = 29;
-    draw_text_ovf(title, frame, 8, offy + rowh * optcnt, 224);
-    draw_central_text(value, frame, 170, offy + rowh * optcnt);
-}
+#ifdef NEW_RENDER_ENGINE
+
+static menuoption UiSetMenuOpts[] = {
+  {
+    MSG_UIS_THEME,
+    IntScroll,
+    0,
+    &menu_theme,
+    // false,
+    NULL
+  },
+  {
+    MSG_UIS_LANG,
+    TxtScroll,
+    MSG_LANG_NAME,
+    NULL,
+    // false,
+    NULL
+  },
+  {
+    MSG_UIS_RECNT,
+    Bool,
+    0,
+    &recent_menu,
+    // false,
+    NULL
+  },
+  {
+    MSG_UIS_ANSPD,
+    TxtScroll,
+    MSG_UIS_SPD0,
+    &anim_speed,
+    // false,
+    NULL
+  },
+  {
+    MSG_UIS_BHID,
+    InvBool,
+    0,
+    &hide_hidden,
+    // false,
+    NULL
+  },
+  {
+    MSG_UIS_SAVE,
+    Save,
+    0,
+    NULL,
+    // false,
+    NULL
+  }
+};
+
+static const menu uiSetMenu = {
+      &smenu.uiset.selector,
+      UiSetMAX,
+      UiSetMenuOpts
+};
+
+#endif
+
 
 void render_ui_settings(volatile uint8_t *frame) {
+  #ifdef NEW_RENDER_ENGINE
+    renderMenu(frame, &uiSetMenu);
+  #endif
+  #ifndef NEW_RENDER_ENGINE
   char tmpbuf[64];
-  if (smenu.uiset.selector > 3)
+  bool scroll = UiSetMAX >= ROW_COUNT;
+  
+  uint8_t offy = (scroll ? 29 : 22);
+
+  if (scroll && smenu.uiset.selector > ROW_COUNT/2)
     draw_central_text("⯅", frame, 120, 15);
-  if (smenu.uiset.selector < UiSetMAX - 2 && UiSetMAX > 5)
-    draw_central_text("⯆", frame, 120, 15 + 20 * UI_ROW_COUNT);//125);
+  if (scroll && smenu.uiset.selector < UiSetMAX - ROW_COUNT/2)
+    draw_central_text("⯆", frame, 120, 15 + 20 * ROW_COUNT);//125);
 
-  uint8_t baseopt = MIN(MAX(0, smenu.uiset.selector - 2), UiSetMAX - UI_ROW_COUNT);
+  uint8_t baseopt;
+  // If we are in the first half of the first page or there aren't enough rows to scroll
+  if (smenu.uiset.selector < ROW_COUNT/2 || !scroll)
+    baseopt = 0;
+  // If we are in the second half of the last page
+  else if (UiSetMAX - smenu.uiset.selector < ROW_COUNT/2) 
+    baseopt = UiSetMAX - ROW_COUNT/2;
+  else 
+    baseopt = smenu.uiset.selector - ROW_COUNT/2;
 
-  for (uint8_t i = 0; i < UI_ROW_COUNT; i++)
+  // npf_snprintf(tmpbuf, sizeof(tmpbuf), " %u ", baseopt);
+  // render_setting_row(frame, "baseopt", tmpbuf, 0);
+  for (uint8_t i = 0; i < ROW_COUNT; i++)
   {
     switch (baseopt + i)
     {
     case UiSetTheme:
-      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %lu >", menu_theme + 1U);
-      render_setting_row(frame, msgs[lang_id][MSG_UIS_THEME], tmpbuf, i);
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %u >", menu_theme + 1U);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_THEME], tmpbuf, i, offy);
       break;
     case UiSetLang:
       npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_LANG_NAME]);
-      render_setting_row(frame, msgs[lang_id][MSG_UIS_LANG], tmpbuf, i);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_LANG], tmpbuf, i, offy);
       break;
     case UiSetRect:
-      render_setting_row(frame, msgs[lang_id][MSG_UIS_RECNT], msgs[lang_id][recent_menu ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], i);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_RECNT], 
+        msgs[lang_id][recent_menu ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED], i, offy);
       break;
     case UiSetASpd:
       npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_UIS_SPD0 + anim_speed]);
-      render_setting_row(frame, msgs[lang_id][MSG_UIS_ANSPD], tmpbuf, i);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_ANSPD], tmpbuf, i, offy);
       break;
     case UiSetHid:
-      render_setting_row(frame, msgs[lang_id][MSG_UIS_BHID], msgs[lang_id][hide_hidden ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED], i);
+      render_setting_row(frame, msgs[lang_id][MSG_UIS_BHID], 
+        msgs[lang_id][hide_hidden ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED], i, offy);
       break;
     case UiSetSave:
       draw_button_box(frame, 20, 220, 132, 152, smenu.uiset.selector == UiSetSave);
@@ -1996,8 +2463,10 @@ void render_ui_settings(volatile uint8_t *frame) {
 
   // Render the highlight bar if not on save
   if (smenu.uiset.selector != UiSetSave)
-    for (unsigned i = 0; i < 240; i += 16)
-      render_icon_trans(i, 22 + (smenu.uiset.selector - baseopt) * 20, 63);
+    #pragma GCC unroll 15
+    for (unsigned i = 0; i < 15; i++)
+      render_icon_trans(i * 16, offy + (smenu.uiset.selector - baseopt) * 20, 63);
+  #endif
 }
 
 void render_info(volatile uint8_t *frame) {
@@ -2168,7 +2637,8 @@ void menu_init(int sram_testres) {
   // Reset to ROM browser and SD card root.
   memset(&smenu, 0, sizeof(smenu));
   memset(&spop, 0, sizeof(spop));
-
+  // set the settings menu selector to 1 to skip the header
+  smenu.set.selector = 1;
   // Reset the file browser as well.
   strcpy(smenu.browser.cpath, "/");
   browser_reload();
@@ -3442,6 +3912,7 @@ bool flash_recover() {
         else
         #endif
           programmed_ok = flash_program(ROM_FLASHFIRMW_ADDR, sdr_state->scratch, fwsize);
+        f_unlink(RECOVERY_FW_FILEPATH);
         return programmed_ok;
       }
     }
