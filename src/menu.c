@@ -39,6 +39,14 @@
 #include "sha256.h"
 #include "supercard_driver.h"
 
+// #include "drawutils.h"
+
+#include "renderEngine.h"
+#include "menustate.h"
+
+#include "menus/settings.h"
+#include "menus/uisettings.h"
+
 #include "res/icons.h"
 #include "res/logo.h"
 
@@ -63,8 +71,6 @@ enum {
   MENUTAB_MAX,
 };
 
-#define ANIM_INITIAL_WAIT     128    // Intial wait (in anim cycles)
-
 enum {
   POPUP_NONE,
   POPUP_GBA_LOAD,              // Load a GBA ROM
@@ -81,17 +87,6 @@ enum {
 #define RECENT_ROWS                  9
 #define NORGAMES_ROWS                8
 
-// First entries reserved for the logo palette.
-#define FG_COLOR         16
-#define BG_COLOR         17
-#define FT_COLOR         18
-#define HI_COLOR         19
-#define IGM_PAL_FG      240
-#define IGM_PAL_BG      241
-#define IGM_PAL_HI      242
-#define IGM_PAL_SH      243
-#define IGM_PAL_BL      244
-#define SEL_COLOR       255
 
 // Starting number of frames to start repeating keypresses
 #define INITIAL_KEY_REPEAT_FRAMES 15
@@ -100,16 +95,6 @@ enum {
 
 #define FLASH_UNLOCK_KEYS      (KEY_BUTTDOWN|KEY_BUTTB|KEY_BUTTSTA)
 #define FLASH_GO_KEYS          (KEY_BUTTUP|KEY_BUTTL|KEY_BUTTR)
-
-enum {
-  UiSetTheme = 0,
-  UiSetLang  = 1,
-  UiSetRect  = 2,
-  UiSetASpd  = 3,
-  UiSetHid   = 4,
-  UiSetSave  = 5,
-  UiSetMAX   = 5,
-};
 
 enum {
   ToolsSDRAMTest = 0,
@@ -123,34 +108,6 @@ enum {
   ToolsMAX,
 };
 
-enum {
-  SettTitle1 = 0,
-  SettHotkey,
-  SettBootType,
-  SettFastSD,
-  #ifdef SUPPORT_NORGAMES
-  SettVerifyNOR,
-  #endif
-  SettFastEWRAM,
-  SettSaveLoc,
-  #ifdef SUPPORT_NORGAMES
-  SettSaveLocNOR,
-  #endif
-  SettSaveBkp,
-  SettStateLoc,
-  SettCheatEn,
-  SettTitle2,
-  DefsPatchEng,
-  DefsGamMenu,
-  DefsRTCEnb,
-  DefsRTCVal,
-  DefsRTCSpeed,
-  DefsLoadPol,
-  DefsSavePol,
-  DefsPrefDS,
-  SettSave,
-  SettMAX
-};
 
 enum {
   DefsSave     = 4,
@@ -230,160 +187,6 @@ const struct {
   { RGB2GBA(0x222222), RGB2GBA(0x444444), RGB2GBA(0xeeeeee), RGB2GBA(0x737573), RGB2GBA(0xaaaaaa), RGB2GBA(0x606060) }, // Dark
 };
 #define THEME_COUNT (sizeof(themes) / sizeof(themes[0]))
-
-typedef struct {
-  // ROM information
-  char romfn[MAX_FN_LEN];             // File to load/write
-  uint32_t romfs;                     // File ROM size
-  char gcode[5];                      // ASCII sanitized game code.
-  t_rom_header romh;                  // ROM header (for info purposes)
-  // Patching info
-  t_patch patches_datab;              // Loaded patches (from DB)
-  t_patch patches_cache;              // Loaded patches (from patch engine's cache)
-  bool patches_datab_found;           // Whether we had a patch match in the database
-  bool patches_cache_found;           // Same but for the patch cache
-  // Patching configuration
-  t_patch_policy patch_type;          // Patching type
-  bool use_dsaving;                   // Whether we use direct-saving mode
-  bool ingame_menu_enabled;           // Enable the in-game menu.
-  bool rtc_patch_enabled;             // Patch for RTC workarounds.
-} t_load_gba_info;
-
-typedef struct {
-  // Save read/write policies and info
-  t_sram_load_policy sram_load_type;  // SRAM loading policy
-  t_sram_save_policy sram_save_type;  // SRAM auto-saving policy
-  char savefn[MAX_FN_LEN];            // Save file path.
-  bool savefile_found;                // Whether there's a .sav file.
-  // RTC config
-  uint32_t rtcval;                    // Initial RTC value.
-  // Cheats policy
-  bool use_cheats;                    // Whether we want to load cheats to use them.
-  bool cheats_found;                  // Whether there's a cheats file (not parsed tho!)
-  unsigned cheats_size;               // Size of the cheat buffer
-  char cheatsfn[MAX_FN_LEN];          // Cheats file path.
-} t_load_gba_lcfg;
-
-typedef void (*t_mrender_fn)(volatile uint8_t *frame);
-typedef void (*t_mkeyupd_fn)(unsigned newkeys, uint16_t deltaframes);
-
-// Info and state for the menu tab
-static struct {
-  uint8_t menu_tab;
-
-  unsigned anim_state;            // Animation (text rotation) status.
-
-  // Recent ROMs state
-  struct {
-    int selector;                 // Pointed file offset
-    int seloff;                   // Entry at the top of the list
-    int maxentries;               // Total file/dir count in current dir
-  } recent;
-
-  // ROM browser state
-  struct {
-    char cpath[MAX_FN_LEN];       // Current path
-    int selector;                 // Pointed file offset
-    int seloff;                   // Entry at the top of the list
-    int maxentries;               // Total file/dir count in current dir
-    int dispentries;              // Maximum number of visible entries (filtered)
-    uint16_t selhist[16];         // History of directory offsets
-  } browser;
-
-  // Flash ROM browser state
-  struct {
-    int selector;                 // Pointed file offset
-    int seloff;                   // Entry at the top of the list
-    uint8_t maxentries;           // Total file/dir count in current dir
-    uint8_t usedblks, freeblks;   // NOR usage info
-  } fbrowser;
-
-  // UI settings
-  struct {
-    int selector;                 // Pointed option
-  } uiset;
-
-  // Main settings
-  struct {
-    int selector;                 // Pointed option
-  } set;
-
-  // Tools menu
-  struct {
-    int selector;                 // Render panel
-  } tools;
-
-  // Info/About menu
-  struct {
-    int selector;                 // Render panel
-    char tstr[64];                // Temp message render
-  } info;
-} smenu;
-
-// Same but for popups.
-static struct {
-  const char *alert_msg;          // Extra pop-up message
-
-  uint8_t pop_num;                // Current pop-up in display
-  char submenu;                   // Which submenu tab we are in (if any)
-  char selector;                  // Option selector (if any)
-  unsigned anim;                  // Animation state
-
-  // Pop up message (for whatever action). Allows returning to previous popup.
-  struct {
-    const char *message;
-    const char *default_button;
-    const char *confirm_button;
-    void (*callback)(bool confirm);       // Function to call on "confirm".
-    uint8_t option;                       // Selected button
-    bool clear_popup_ok;                  // Whether any pop up must be cleared.
-  } qpop;
-
-  // RTC time set pop up, a bit special.
-  struct {
-    t_dec_date val;
-    int selector;
-    void (*callback)();                   // Function to call on "save"
-  } rtcpop;
-
-  union {
-    // GBA launch ROM pop up menu
-    struct {
-      t_load_gba_info i;                  // ROM/Patch info and patch policy.
-      t_load_gba_lcfg l;                  // ROM loading info and settings;
-    } load;
-
-    // Write GBA game to NOR memory
-    struct {
-      t_load_gba_info i;                  // ROM/Patch info and patch policy.
-    } norwr;
-    // Launch GBA game from NOR memory
-    struct {
-      t_load_gba_lcfg l;                  // ROM loading info and settings;
-      const t_flash_game_entry *e;        // NOR game entry on RAM
-    } norld;
-
-    // Save file menu (.sav files)
-    struct {
-      char savfn[MAX_FN_LEN];             // SAV file to load/store/mangle
-    } savopt;
-    // Update menu (for .fw files)
-    struct {
-      char fn[MAX_FN_LEN];                // FW file to load and flash
-      bool issfw;                         // The firmware is a superFW image.
-      uint32_t superfw_ver;               // Reported FW version.
-      uint32_t fw_size;                   // Size in bytes reported by stat.
-      unsigned curr_state;                // Flashing FSM state.
-    } update;
-
-    // Not really a pop up, but used as "popup" data for menu questions.
-    struct {
-      char fn[MAX_FN_LEN];
-      unsigned fs;
-    } pdb_ld;
-  } p;
-} spop;
-
 typedef struct {
   uint32_t filesize;
   uint16_t isdir;
@@ -414,17 +217,10 @@ _Static_assert (sizeof(t_sdram_state) <= 14.5*1024*1024, "scratch SDRAM doesn't 
 t_sdram_state *sdr_state = (t_sdram_state*)0x08000000;
 uint8_t *hiscratch = (uint8_t*)ROM_HISCRATCH_U8;
 
-typedef struct {
-  uint16_t y, x;
-  unsigned tn;
-} t_oamobj;
+
 
 static bool enable_flashing = true;
 //false;
-static unsigned framen = 0;
-static unsigned objnum = 0;
-static t_oamobj fobjs[64];
-
 static unsigned prevkeys = 0;
 static uint32_t hfracnt = 0;
 static uint32_t hfrarpt = INITIAL_KEY_REPEAT_FRAMES;
@@ -479,26 +275,10 @@ NOINLINE int romsort(const void *a, const void *b) {
   return strcasecmp(&ca->game_name[ca->bnoffset], &cb->game_name[cb->bnoffset]);
 }
 
-static void loadrom_progress(unsigned done, unsigned total) {
-  // Draws and flips the buffer, do not care about vsync here
-  volatile uint8_t *frame = &MEM_VRAM_U8[0xA000*framen];
 
-  // Render the full background to a solid color
-  dma_memset16(&frame[0], dup8(BG_COLOR), SCREEN_WIDTH*SCREEN_HEIGHT/2);
-
-  // Render a simple progress bar
-  unsigned prog = done * 200 / total;
-  for (unsigned i = 76; i < 84; i++)
-    dma_memset16(&frame[SCREEN_WIDTH * i + 20], dup8(FG_COLOR), prog/2);
-
-  dma_memset16(MEM_OAM, 0, 256);  // Clear icons
-
-  REG_DISPCNT = (REG_DISPCNT & ~0x10) | (framen << 4);
-  framen ^= 1;
-}
 
 static bool loadrom_progress_abort(unsigned done, unsigned total) {
-  loadrom_progress(done, total);
+  draw_progress_bar(done, total);
 
   // Capture A/B buttons to abort the progress
   return ((~REG_KEYINPUT) & KEY_BUTTSTA);
@@ -528,14 +308,14 @@ bool generate_patches_progress(const char *fn, unsigned fs) {
       dma_memcpy32(&hiscratch[j], tmp, sizeof(tmp)/4);
       set_supercard_mode(MAPPED_SDRAM, true, true);
       if (j & ~0xFFFF)
-        loadrom_progress((i*2 + j) >> 8, fs >> 7);
+        draw_progress_bar((i*2 + j) >> 8, fs >> 7);
     }
     // Amount to process.
     unsigned blksize = MIN(max_hiscratch, fs - i);
 
     void upd_pe_prog(unsigned prog) {
       unsigned p = i*2 + blksize + prog*4;
-      loadrom_progress(p >> 8, fs >> 7);
+      draw_progress_bar(p >> 8, fs >> 7);
     }
 
     // Process patches. Adds them to the existing patchset.
@@ -584,7 +364,7 @@ bool dump_flashmem_backup() {
       return false;
     }
 
-    loadrom_progress(i >> 10, fsize >> 10);
+    draw_progress_bar(i >> 10, fsize >> 10);
   }
 
   f_close(&fd);
@@ -1005,7 +785,7 @@ void start_emu_game(const t_emu_loader *ldinfo, const char *fn, uint32_t fs) {
       if (recent_menu)
         insert_recent_flush(fn, FLAG_RECENT_SD);
 
-      unsigned errcode = load_extemu_rom(fn, fs, ldinfo, loadrom_progress);
+      unsigned errcode = load_extemu_rom(fn, fs, ldinfo, draw_progress_bar);
       if (errcode && errcode != ERR_LOAD_NOEMU)
         break;
       ldinfo++;
@@ -1177,29 +957,6 @@ static void flashbrowser_reload() {
   #endif
 }
 
-static inline void render_icon(unsigned x, unsigned y, unsigned iconn) { 
-  fobjs[objnum++] = (t_oamobj){
-    // Use 256 entries palette
-    y | 0x2000,
-    // Size 16x16 
-    x | 0x4000,
-    // OBJ numbers start at 512 for Mode 4
-    8 * iconn + 512
-  };
-}
-
-static inline void render_icon_trans(unsigned x, unsigned y, unsigned iconn) {
-  fobjs[objnum++] = (t_oamobj){
-    // 0x2000 Use 256 entries palette
-    // 0x0400 make transparent
-    y | 0x2400, 
-    // Size 16x16 
-    x | 0x4000, 
-    // OBJ numbers start at 512 for Mode 4
-    8*iconn + 512
-  };
-}
-
 // Guess the file type based on the file name.
 static unsigned guessicon(const char *path) {
   unsigned l = strlen(path);
@@ -1222,128 +979,6 @@ static unsigned guessicon(const char *path) {
   return ICON_BINFILE;
 }
 
-// Draws text adding some support for overflow.
-#define THREEDOTS_WIDTH  9
-static void draw_text_ovf(const char *t, volatile uint8_t *frame, unsigned x, unsigned y, unsigned maxw) {
-  uint8_t *basept = (uint8_t*)&frame[y * SCREEN_WIDTH + x];
-  unsigned twidth = font_width(t);
-  if (twidth <= maxw)
-    draw_text_idx8_bus16(t, basept, SCREEN_WIDTH, FT_COLOR);
-  else {
-    char tmpbuf[256];
-    unsigned numchars = font_width_cap(t, maxw - THREEDOTS_WIDTH);
-    memcpy(tmpbuf, t, numchars);
-    memcpy(&tmpbuf[numchars], "...", 4);
-    draw_text_idx8_bus16(tmpbuf, basept, SCREEN_WIDTH, FT_COLOR);
-  }
-}
-
-static void draw_text_leftovf(const char *t, volatile uint8_t *frame, unsigned x, unsigned y, unsigned maxw) {
-  uint8_t *basept = (uint8_t*)&frame[y * SCREEN_WIDTH + x];
-  unsigned numchars = font_width_lcap(t, maxw - THREEDOTS_WIDTH);
-  if (numchars) {
-    draw_text_idx8_bus16("...", basept, SCREEN_WIDTH, FT_COLOR);
-    draw_text_idx8_bus16(&t[numchars], basept + THREEDOTS_WIDTH, SCREEN_WIDTH, FT_COLOR);
-  } else {
-    draw_text_idx8_bus16(t, basept, SCREEN_WIDTH, FT_COLOR);
-  }
-}
-
-static void draw_text_ovf_rotate(const char *t, volatile uint8_t *frame, unsigned x, unsigned y, unsigned maxw, unsigned *franim) {
-  uint8_t *basept = (uint8_t*)&frame[y * SCREEN_WIDTH + x];
-  unsigned twidth = font_width(t);
-  if (twidth <= maxw)
-    draw_text_idx8_bus16(t, basept, SCREEN_WIDTH, FT_COLOR);
-  else {
-    unsigned anim = *franim > ANIM_INITIAL_WAIT ? (*franim - ANIM_INITIAL_WAIT) >> 4 : 0;
-
-    // Wrap around once the text end reaches the mid point aprox.
-    char tmpbuf[540];
-    strcpy(tmpbuf, t);
-    strcat(tmpbuf, "      ");
-    unsigned pixw = font_width(tmpbuf);
-    if (anim > pixw)
-      *franim = ANIM_INITIAL_WAIT + ((anim - pixw) << 4);
-    strcat(tmpbuf, t);
-
-    draw_text_idx8_bus16_range(tmpbuf, basept, anim, maxw, SCREEN_WIDTH, FT_COLOR);
-  }
-}
-
-static void draw_box_outline(volatile uint8_t *frame, unsigned left, unsigned right, unsigned top, unsigned bottom, uint8_t color) {
-  dma_memset16(&frame[SCREEN_WIDTH * top + left], dup8(color), (right - left) / 2);
-  dma_memset16(&frame[SCREEN_WIDTH * (top + 1) + left], dup8(color), (right - left) / 2);
-  dma_memset16(&frame[SCREEN_WIDTH * (bottom - 1) + left], dup8(color), (right - left) / 2);
-  dma_memset16(&frame[SCREEN_WIDTH * (bottom - 2) + left], dup8(color), (right - left) / 2);
-  while (top < bottom) {
-    *((uint16_t*)&frame[SCREEN_WIDTH * top + left]) = dup8(color);
-    *((uint16_t*)&frame[SCREEN_WIDTH * top + right - 2]) = dup8(color);
-    top++;
-  }
-}
-
-static void draw_box_full(
-  volatile uint8_t *frame, unsigned left, unsigned right, unsigned top, unsigned bottom,
-  uint8_t outlinecolor, uint8_t bgcolor
-) {
-  draw_box_outline(frame, left, right, top, bottom, outlinecolor);
-  for (unsigned i = top + 2; i < bottom - 2; i++)
-    dma_memset16(&frame[SCREEN_WIDTH * i + left + 2], dup8(bgcolor), (right - left - 4) / 2);
-}
-
-static void draw_button_box(
-  volatile uint8_t *frame, unsigned left, unsigned right, unsigned top, unsigned bottom, bool selected
-) {
-  if (selected)
-    draw_box_full(frame, left, right, top, bottom, FG_COLOR, HI_COLOR);
-  else
-    draw_box_outline(frame, left, right, top, bottom, FG_COLOR);
-}
-
-
-static void draw_rightj_text(const char *t, volatile uint8_t *frame, unsigned x, unsigned y) {
-  unsigned twidth = font_width(t);
-  uint8_t *basept = (uint8_t*)&frame[y * SCREEN_WIDTH + x - twidth];
-  draw_text_idx8_bus16(t, basept, SCREEN_WIDTH, FT_COLOR);
-}
-
-static void draw_central_text(const char *t, volatile uint8_t *frame, unsigned x, unsigned y) {
-  unsigned twidth = font_width(t);
-  uint8_t *basept = (uint8_t*)&frame[y * SCREEN_WIDTH + x - twidth / 2];
-  draw_text_idx8_bus16(t, basept, SCREEN_WIDTH, FT_COLOR);
-}
-
-static void draw_central_text_ovf(const char *t, volatile uint8_t *frame, unsigned x, unsigned y, unsigned maxw) {
-  unsigned twidth = font_width(t);
-  if (twidth <= maxw) {
-    uint8_t *basept = (uint8_t*)&frame[y * SCREEN_WIDTH + x - twidth / 2];
-    draw_text_idx8_bus16(t, basept, SCREEN_WIDTH, FT_COLOR);
-  } else {
-    char tmpbuf[256];
-    unsigned numchars = font_width_cap(t, maxw - THREEDOTS_WIDTH);
-    memcpy(tmpbuf, t, numchars);
-    memcpy(&tmpbuf[numchars], "...", 4);
-    uint8_t *basept = (uint8_t*)&frame[y * SCREEN_WIDTH + x - maxw / 2];
-    draw_text_idx8_bus16(tmpbuf, basept, SCREEN_WIDTH, FT_COLOR);
-  }
-}
-
-static void draw_central_text_wrapped(const char *t, volatile uint8_t *frame, unsigned x, unsigned y, unsigned maxw) {
-  while (*t) {
-    char tmp[128];
-    unsigned outw;
-    unsigned linechars = font_width_cap_space(t, maxw, &outw);
-    unsigned charcnt = linechars ?: utf8_strlen(t);
-    uint8_t *basept = (uint8_t*)&frame[y * SCREEN_WIDTH + x - outw / 2];
-
-    memcpy(tmp, t, charcnt);
-    tmp[charcnt] = 0;
-    draw_text_idx8_bus16(tmp, basept, SCREEN_WIDTH, FT_COLOR);
-
-    t += charcnt;      // Advance text
-    y += 16;           // Move down in the buffer
-  }
-}
 
 void render_recent(volatile uint8_t *frame) {
   // Render the list from memory.
@@ -1769,388 +1404,6 @@ void render_rtcpop(volatile uint8_t *frame) {
   draw_central_text("⯆", frame, cox[spop.rtcpop.selector], 84);
 }
 
-static inline void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t optcnt, uint8_t offy) {
-    const unsigned rowh = 20;
-    draw_text_ovf(title, frame, 8, offy + rowh * optcnt, 224);
-    draw_central_text(value, frame, 170, offy + rowh * optcnt);
-}
-
-#ifdef NEW_RENDER_ENGINE
-
-typedef enum {
-  Header,
-  RTC,
-  IntScroll,
-  TxtScroll,
-  ArrScroll,
-  Bool,
-  InvBool,
-  HotKey,
-  Callback,
-  Save
-} menuOptionType;
-
-typedef void (*menuoptioncallback)(char *tmpbuf);
-
-typedef struct menuoption {
-    /* Translation Id */
-  uint32_t name;
-  menuOptionType type;
-  /* Translation Id */
-  uint32_t baseOption;
-  uint8_t *selectedOption;
-  // bool animate;
-  menuoptioncallback callback;
-} menuoption;
-
-typedef struct menu {
-  int *selector;
-  uint16_t optionCount;
-  menuoption *options;
-  void (*helpCallback)(volatile uint8_t *frame);
-} menu;
-
-void renderMenu(volatile uint8_t *frame, const menu *menu) {
-  char tmpbuf[128];
-  uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
-  bool scroll = menu->optionCount >= numrows;
-
-  unsigned int rowh = 20;
-  
-  uint8_t offy = (scroll ? 29 : 22);
-
-  unsigned selector = *menu->selector;
-
-  if (scroll && selector > numrows/2)
-    draw_central_text("⯅", frame, 120, 15);
-  if (scroll && selector < menu->optionCount - numrows/2)
-    draw_central_text("⯆", frame, 120, 15 + 20 * numrows);//125);
-
-  uint8_t baseopt;
-  // If we are in the first half of the first page or there aren't enough rows to scroll
-  if (selector < numrows/2 || !scroll)
-    baseopt = 0;
-  // If we are in the second half of the last page
-  else if (menu->optionCount - selector < numrows/2) 
-    baseopt = menu->optionCount - numrows/2;
-  else 
-    baseopt = selector - numrows/2;
-
-  // npf_snprintf(tmpbuf, sizeof(tmpbuf), " %u ", baseopt);
-  // render_setting_row(frame, "baseopt", tmpbuf, 0);
-  
-  for (uint8_t offopt = 0; offopt < MIN(numrows, menu->optionCount); offopt++)
-  {
-      menuoption *selopt = &menu->options[baseopt + offopt];
-      switch (selopt->type)
-      {
-      case Header:
-        draw_central_text(msgs[lang_id][selopt->name], frame, SCREEN_WIDTH/2, offy + rowh*offopt);
-        break;
-      case TxtScroll:
-        npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", 
-          msgs[lang_id][selopt->baseOption + (selopt->selectedOption == NULL ? 0 : *selopt->selectedOption)]);
-          render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
-        break;
-      case IntScroll:
-        npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %i >", *((uint8_t*) selopt->selectedOption));
-        render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
-        break;
-      case Bool:
-        render_setting_row(frame, msgs[lang_id][selopt->name], 
-          msgs[lang_id][(selopt->baseOption ? selopt->baseOption : MSG_KNOB_DISABLED)+ *((bool *) selopt->selectedOption)],
-         // msgs[lang_id][(*((bool *) selopt->selectedOption) ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED)],
-           offopt, offy);
-        break;
-      case InvBool:
-        render_setting_row(frame, msgs[lang_id][selopt->name], 
-          msgs[lang_id][(selopt->baseOption ? selopt->baseOption : MSG_KNOB_DISABLED) + 1 - *((bool *) selopt->selectedOption)],
-          // msgs[lang_id][(*((bool *) selopt->selectedOption) ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED)],
-           offopt, offy);
-        break;
-      case Callback:
-        selopt->callback(tmpbuf);
-        render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
-        break;
-      case Save:
-        // draw_button_box(frame, 20, 220, 132, 152, selector == (baseopt + offopt));
-        draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
-        break;
-      default:
-        break;
-      }
-  }
-
-  // Render the highlight bar if not on save
-  // if (smenu.uiset.selector != UiSetSave)
-    // #pragma GCC unroll 15
-    for (unsigned i = 0; i < 15; i++)
-      render_icon_trans(i * 16, offy + (selector - baseopt) * rowh, 63);
-  if (menu->helpCallback != NULL)
-    menu->helpCallback(frame);
-}
-
-
-static void  rtcRenderCallback(char *tmpbuf){
-        t_dec_date d;
-        timestamp2date(rtcvalue_default, &d);
-        npf_snprintf(tmpbuf, sizeof(tmpbuf), "20%02d/%02d/%02d %02d:%02d",
-          d.year, d.month, d.day, d.hour, d.min);
-}
-
-static void rtcSpeedRenderCallback(char *tmpbuf) {
-  unsigned spdmsg = rtcspeed_default ? (MSG_UIS_SPD0 + rtcspeed_default - 1) : MSG_STILLRTC;
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][spdmsg]);
-}
-
-static void hotkeyRenderCallback(char *tmpbuf){
-      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", hotkey_list[hotkey_combo].cname);
-}
-
-static void savePathRenderCallback(char *tmpbuf){
-  if (save_path_default == SaveRomName)
-    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_NEXTTO_ROM]);
-  else
-    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", save_paths[save_path_default]);
-}
-
-static void savePathFlashRenderCallback(char *tmpbuf) {
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", save_paths[save_path_nor_default]);
-}
-
-static void saveStatePathRenderCallback(char *tmpbuf){
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", savestates_paths_display[state_path_default]);
-}
-
-
-
-static menuoption SetMenuOpts[] = {
-  {
-    MSG_SET_TITL1,
-    Header,
-    0,
-    NULL,
-    // false,
-    NULL
-  },
-  {
-    MSG_SETT_HOTK,
-    Callback,
-    0,
-    NULL,
-    // false,
-    hotkeyRenderCallback
-  },
-  {
-    MSG_SETT_BOOT,
-    TxtScroll,
-    MSG_BOOT_TYPE0,
-    &boot_bios_splash,
-    // false,
-    NULL
-  },
-  {
-    MSG_SETT_FASTSD,
-    InvBool,
-    0,
-    &use_slowld,
-    // false,
-    NULL
-  },
-  #ifdef SUPPORT_NORGAMES
-  {
-    MSG_SETT_VERNOR,
-    Bool,
-    0,
-    &use_verify_nor,
-    // false,
-    NULL
-  },
-  #endif
-  {
-    MSG_SETT_FASTEW,
-    Bool,
-    0,
-    &use_fastew,
-    // false,
-    NULL
-  },
-  {
-    MSG_SETT_SAVET,
-    Callback,
-    0,
-    NULL,
-    // false,
-    savePathRenderCallback
-  },
-  #ifdef SUPPORT_NORGAMES
-  {
-    MSG_SETT_SAVETX,
-    Callback,
-    0,
-    NULL,
-    // false,
-    savePathFlashRenderCallback
-  },
-  #endif
-  {
-    MSG_SETT_SAVEBK,
-    IntScroll,
-    0,
-    &backup_sram_default,
-    // false,
-    NULL
-  },
-  {
-    MSG_SETT_STATET,
-    Callback,
-    0,
-    NULL,
-    // false,
-    saveStatePathRenderCallback
-  },
-  {
-    MSG_SETT_CHTEN,
-    Bool,
-    0,
-    &enable_cheats,
-    // false,
-    NULL
-  },
-  {
-    MSG_SET_TITL2,
-    Header,
-    0,
-    NULL,
-    // false,
-    NULL
-  },
-  {
-    MSG_DEFS_PATCH,
-    TxtScroll,
-    MSG_PATCH_TYPE0,
-    &patcher_default,
-    // false,
-    NULL
-  },
-  {
-    MSG_LOADER_MENU,
-    Bool,
-    0,
-    &ingamemenu_default,
-    // false,
-    NULL
-  },
-  {
-    MSG_LOADER_RTCE,
-    Bool,
-    0,
-    &rtcpatch_default,
-    // false,
-    NULL
-  },
-  {
-    MSG_DEF_RTCVAL,
-    Callback,
-    0,
-    NULL,
-    // false,
-    rtcRenderCallback
-  },
-  {
-    MSG_DEF_SPEED,
-    Callback,
-    0,
-    NULL,
-    // false,
-    rtcSpeedRenderCallback
-  },
-  {
-    MSG_LOADER_LOADP,
-    InvBool,
-    MSG_DEF_LOADP0,
-    &autoload_default,
-    // false,
-    NULL
-  },
-  {
-    MSG_LOADER_SAVEP,
-    Bool,
-    MSG_DEF_SAVEP0,
-    &autosave_default,
-    // false,
-    NULL
-  },
-  {
-    MSG_LOADER_PREFDS,
-    Bool,
-    0,
-    &autosave_prefer_ds,
-    // false,
-    NULL
-  },
-  {
-    MSG_UIS_SAVE,
-    Save,
-    0,
-    NULL,
-    // false,
-    NULL
-  }
-};
-
-
-
-void uiSetRenderHelp(volatile uint8_t *frame) {
-  char tmp[128];
-  // Render bar below for help messge
-  dma_memset16(&frame[240*140], dup8(FG_COLOR), 240*20/2);
-
-  if (smenu.set.selector == SettSaveLoc) {
-    if (save_path_default == SaveRomName)
-      draw_text_ovf_rotate(msgs[lang_id][MSG_SAVE_TYPE_NR], frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
-    else {
-      npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_SAVE_TYPE_PT], save_paths[save_path_default]);
-      draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
-    }
-  }
-  else if (smenu.set.selector == SettStateLoc) {
-    npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_STATE_TYPE_PT], savestates_paths[state_path_default]);
-    draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
-  }
-  #ifdef SUPPORT_NORGAMES
-  else if (smenu.set.selector == SettSaveLocNOR) {
-    npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_SAVE_TYPE_PTX], save_paths[save_path_nor_default]);
-    draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
-  }
-  #endif
-  else {
-    unsigned help_msg = smenu.set.selector == SettBootType ? MSG_BOOT_TYPE_I0 + boot_bios_splash :
-                        smenu.set.selector == SettSaveBkp  ? MSG_BACKUP_I :
-                        smenu.set.selector == SettFastSD   ? MSG_FASTSD_I :
-                        smenu.set.selector == SettFastEWRAM? MSG_FASTEW_I :
-                        smenu.set.selector == DefsPatchEng ? MSG_PATCH_TYPE_I0 + patcher_default :
-                        smenu.set.selector == DefsLoadPol  ? MSG_DEF_LOADP_I0 + (autoload_default ^ 1) :
-                        smenu.set.selector == DefsSavePol  ? MSG_DEF_SAVEP_I0 + (autosave_default ^ 1) :
-                        smenu.set.selector == DefsPrefDS   ? MSG_LOADER_PREFDSI :
-                        #ifdef SUPPORT_NORGAMES
-                        smenu.set.selector == SettVerifyNOR ? MSG_VERNOR_I :
-                        #endif
-                        MSG_EMPTY;
-    draw_text_ovf_rotate(msgs[lang_id][help_msg], frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
-  }
-}
-
-static const menu globalSetMenu = {
-      &smenu.set.selector,
-      SettMAX,
-      SetMenuOpts,
-      uiSetRenderHelp
-};
-
-
-#endif
-
 
 void render_settings(volatile uint8_t *frame) {
   #ifdef NEW_RENDER_ENGINE
@@ -2337,68 +1590,6 @@ void render_settings(volatile uint8_t *frame) {
       render_icon_trans(i, offy + (smenu.set.selector - baseopt) * 20, 63);
   #endif
 }
-
-
-#ifdef NEW_RENDER_ENGINE
-
-static menuoption UiSetMenuOpts[] = {
-  {
-    MSG_UIS_THEME,
-    IntScroll,
-    0,
-    &menu_theme,
-    // false,
-    NULL
-  },
-  {
-    MSG_UIS_LANG,
-    TxtScroll,
-    MSG_LANG_NAME,
-    NULL,
-    // false,
-    NULL
-  },
-  {
-    MSG_UIS_RECNT,
-    Bool,
-    0,
-    &recent_menu,
-    // false,
-    NULL
-  },
-  {
-    MSG_UIS_ANSPD,
-    TxtScroll,
-    MSG_UIS_SPD0,
-    &anim_speed,
-    // false,
-    NULL
-  },
-  {
-    MSG_UIS_BHID,
-    InvBool,
-    0,
-    &hide_hidden,
-    // false,
-    NULL
-  },
-  {
-    MSG_UIS_SAVE,
-    Save,
-    0,
-    NULL,
-    // false,
-    NULL
-  }
-};
-
-static const menu uiSetMenu = {
-      &smenu.uiset.selector,
-      UiSetMAX,
-      UiSetMenuOpts
-};
-
-#endif
 
 
 void render_ui_settings(volatile uint8_t *frame) {
@@ -2625,13 +1816,7 @@ void menu_render(unsigned fcnt) {
   }
 }
 
-void menu_flip() {
-  /* Copy icons directly instead of iterating */
-  dma_memcpy16(&MEM_OAM[0], fobjs, objnum * 4);
-  dma_memset16(&MEM_OAM[objnum*4], 0, 256 - objnum*2);  // Clear unused objects
-  REG_DISPCNT = (REG_DISPCNT & ~0x10) | (framen << 4);
-  framen ^= 1;
-}
+
 
 void menu_init(int sram_testres) {
   // Reset to ROM browser and SD card root.
@@ -2953,7 +2138,7 @@ static void keypress_popup_loadgba(unsigned newkeys, uint16_t keypresses) {
         spop.p.load.i.ingame_menu_enabled,
         spop.p.load.i.rtc_patch_enabled ? &rtci : NULL,
         spop.p.load.l.use_cheats ? spop.p.load.l.cheats_size : 0,
-        loadrom_progress);
+        draw_progress_bar);
       if (err) {
         // Show any errors that might have happened!
         spop.alert_msg = msgs[lang_id][MSG_ERR_READ];
@@ -3084,7 +2269,7 @@ static void keypress_popup_norwrite(unsigned newkeys, uint16_t keypresses) {
         unsigned errc = flash_gba_nor(info->romfn, info->romfs, &info->romh, p,
                                       info->use_dsaving, info->ingame_menu_enabled,
                                       info->rtc_patch_enabled,
-                                      ne.blkmap, loadrom_progress,
+                                      ne.blkmap, draw_progress_bar,
                                       sdr_state->scratch, scratch_mem_size);
         if (errc)
           spop.alert_msg = msgs[lang_id][errc == ERR_LOAD_BADROM ? MSG_ERR_READ : MSG_ERR_NORUPD];
