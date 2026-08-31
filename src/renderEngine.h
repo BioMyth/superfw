@@ -29,7 +29,7 @@ typedef enum menuOptionType {
   InvBool,
   HotKey,
   Callback,
-  Save
+  Button
 } menuOptionType;
 
 typedef void (*menuoptioncallback)(char *tmpbuf);
@@ -62,6 +62,8 @@ static inline void render_setting_row(volatile uint8_t *frame, const char *title
 void renderMenu(volatile uint8_t *frame, const menu *menu) {
   char tmpbuf[128];
   uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
+  // Odd number round up, e.g. 5 -> we want 3
+  uint8_t halfnumrows = (numrows + 1 ) / 2;
   bool scroll = menu->optionCount >= numrows;
 
   unsigned int rowh = 20;
@@ -70,64 +72,65 @@ void renderMenu(volatile uint8_t *frame, const menu *menu) {
 
   unsigned selector = *menu->selector;
 
-  if (scroll && selector > numrows/2)
+  if (scroll && selector > halfnumrows)
     draw_central_text("⯅", frame, 120, 15);
-  if (scroll && selector < menu->optionCount - numrows/2)
+  if (scroll && selector < menu->optionCount - halfnumrows)
     draw_central_text("⯆", frame, 120, 15 + 20 * numrows);//125);
 
   uint8_t baseopt;
   // If we are in the first half of the first page or there aren't enough rows to scroll
-  if (selector < numrows/2 || !scroll)
+  if (selector < halfnumrows || !scroll)
     baseopt = 0;
   // If we are in the second half of the last page
-  else if (menu->optionCount - selector < numrows/2) 
-    baseopt = menu->optionCount - numrows/2;
+  else if (menu->optionCount - selector < halfnumrows) 
+    baseopt = menu->optionCount - halfnumrows;
   else 
-    baseopt = selector - numrows/2;
+    baseopt = selector - halfnumrows;
 
   // npf_snprintf(tmpbuf, sizeof(tmpbuf), " %u ", baseopt);
   // render_setting_row(frame, "baseopt", tmpbuf, 0);
   
   for (uint8_t offopt = 0; offopt < MIN(numrows, menu->optionCount); offopt++)
   {
-      menuoption *selopt = &menu->options[baseopt + offopt];
-      switch (selopt->type)
-      {
-      case Header:
-        draw_central_text(msgs[lang_id][selopt->name], frame, SCREEN_WIDTH/2, offy + rowh*offopt);
-        break;
-      case TxtScroll:
-        npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", 
-          msgs[lang_id][selopt->baseOption + (selopt->selectedOption == NULL ? 0 : *selopt->selectedOption)]);
-          render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
-        break;
-      case IntScroll:
-        npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %i >", *((uint8_t*) selopt->selectedOption));
+    uint16_t curropt = baseopt + offopt;
+    if (curropt >= menu->optionCount)
+      break;
+    menuoption *selopt = &menu->options[baseopt + offopt];
+    switch (selopt->type)
+    {
+    case Header:
+      draw_central_text(msgs[lang_id][selopt->name], frame, SCREEN_WIDTH/2, offy + rowh*offopt);
+      break;
+    case TxtScroll:
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", 
+        msgs[lang_id][selopt->baseOption + (selopt->selectedOption == NULL ? 0 : *selopt->selectedOption)]);
         render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
-        break;
-      case Bool:
-        render_setting_row(frame, msgs[lang_id][selopt->name], 
-          msgs[lang_id][(selopt->baseOption ? selopt->baseOption : MSG_KNOB_DISABLED)+ *((bool *) selopt->selectedOption)],
-         // msgs[lang_id][(*((bool *) selopt->selectedOption) ? MSG_KNOB_ENABLED : MSG_KNOB_DISABLED)],
-           offopt, offy);
-        break;
-      case InvBool:
-        render_setting_row(frame, msgs[lang_id][selopt->name], 
-          msgs[lang_id][(selopt->baseOption ? selopt->baseOption : MSG_KNOB_DISABLED) + 1 - *((bool *) selopt->selectedOption)],
-          // msgs[lang_id][(*((bool *) selopt->selectedOption) ? MSG_KNOB_DISABLED : MSG_KNOB_ENABLED)],
-           offopt, offy);
-        break;
-      case Callback:
-        selopt->callback(tmpbuf);
-        render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
-        break;
-      case Save:
-        // draw_button_box(frame, 20, 220, 132, 152, selector == (baseopt + offopt));
-        draw_central_text(msgs[lang_id][MSG_UIS_SAVE], frame, 120, 134);
-        break;
-      default:
-        break;
-      }
+      break;
+    case IntScroll:
+      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %i >", *((uint8_t*) selopt->selectedOption));
+      render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
+      break;
+    case Bool:
+      render_setting_row(frame, msgs[lang_id][selopt->name], 
+        msgs[lang_id][(selopt->baseOption ? selopt->baseOption : MSG_KNOB_DISABLED)+ *((bool *) selopt->selectedOption)],
+          offopt, offy);
+      break;
+    case InvBool:
+      render_setting_row(frame, msgs[lang_id][selopt->name], 
+        msgs[lang_id][(selopt->baseOption ? selopt->baseOption : MSG_KNOB_DISABLED) + 1 - *((bool *) selopt->selectedOption)],
+          offopt, offy);
+      break;
+    case Callback:
+      selopt->callback(tmpbuf);
+      render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
+      break;
+    case Button:
+      draw_button_box(frame, 20, 220, 132, 152, selector == (baseopt + offopt));
+      draw_central_text(msgs[lang_id][selopt->name], frame, 120, 134);
+      break;
+    default:
+      break;
+    }
   }
 
   // Render the highlight bar if not on save

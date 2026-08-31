@@ -27,39 +27,64 @@
 #define IGM_PAL_BL      244
 #define SEL_COLOR       255
 
+#define MAX_OBJS 64
 
 typedef struct {
   uint16_t y, x;
   unsigned tn;
-} t_oamobj;
+} oamobj_t;
 
-static t_oamobj fobjs[64];
+struct frameState {
+  oamobj_t objs[MAX_OBJS];
+  unsigned objnum;
+  unsigned framen;
+} fstate = {
+  .objs = {},
+  .objnum = 0,
+  .framen = 0
+};
 
-static unsigned objnum = 0;
-
-static unsigned framen = 0;
+static inline bool push_sprite(oamobj_t sprite) {
+  if (fstate.objnum >= MAX_OBJS)
+    return false;
+  fstate.objs[fstate.objnum++] = sprite;
+  return true;
+} 
 
 static inline void render_icon(unsigned x, unsigned y, unsigned iconn) { 
-  fobjs[objnum++] = (t_oamobj){
+  push_sprite((oamobj_t){
     // Use 256 entries palette
-    y | 0x2000,
+    .y = y | 0x2000,
     // Size 16x16 
-    x | 0x4000,
+    .x = x | 0x4000,
     // OBJ numbers start at 512 for Mode 4
-    8 * iconn + 512
-  };
+    .tn = 8 * iconn + 512
+  });
 }
 
-static inline void render_icon_trans(unsigned x, unsigned y, unsigned iconn) {
-  fobjs[objnum++] = (t_oamobj){
-    // 0x2000 Use 256 entries palette
-    // 0x0400 make transparent
-    y | 0x2400, 
+static inline void render_icon_trans(unsigned x, unsigned y, unsigned iconn) { 
+  push_sprite((oamobj_t){
+    // Use 256 entries palette
+    .y = y | 0x2400,
     // Size 16x16 
-    x | 0x4000, 
+    .x = x | 0x4000,
     // OBJ numbers start at 512 for Mode 4
-    8*iconn + 512
-  };
+    .tn = 8 * iconn + 512
+  });
+}
+
+// Split into two functions since one can be unrolled
+static inline void render_bar_fs(unsigned y) {
+  // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
+  #pragma GCC UNROLL 15
+  for (unsigned i = 0; i < 15; i ++)
+    render_icon_trans(i * 16, y, 63);
+}
+
+static inline void render_bar(unsigned startx, unsigned endx, unsigned y) {
+  // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
+  for (unsigned i = 0; i < ((startx - endx) / 16); i ++)
+    render_icon_trans(startx + (i * 16), y, 63);
 }
 
 
@@ -188,7 +213,7 @@ static void draw_central_text_wrapped(const char *t, volatile uint8_t *frame, un
 
 static void draw_progress_bar(unsigned done, unsigned total) {
   // Draws and flips the buffer, do not care about vsync here
-  volatile uint8_t *frame = &MEM_VRAM_U8[0xA000*framen];
+  volatile uint8_t *frame = &MEM_VRAM_U8[0xA000*fstate.framen];
 
   // Render the full background to a solid color
   dma_memset16(&frame[0], dup8(BG_COLOR), SCREEN_WIDTH*SCREEN_HEIGHT/2);
@@ -200,14 +225,14 @@ static void draw_progress_bar(unsigned done, unsigned total) {
 
   dma_memset16(MEM_OAM, 0, 256);  // Clear icons
 
-  REG_DISPCNT = (REG_DISPCNT & ~0x10) | (framen << 4);
-  framen ^= 1;
+  REG_DISPCNT = (REG_DISPCNT & ~0x10) | (fstate.framen << 4);
+  fstate.framen ^= 1;
 }
 
 void menu_flip() {
   /* Copy icons directly instead of iterating */
-  dma_memcpy16(&MEM_OAM[0], fobjs, objnum * 4);
-  dma_memset16(&MEM_OAM[objnum*4], 0, 256 - objnum*2);  // Clear unused objects
-  REG_DISPCNT = (REG_DISPCNT & ~0x10) | (framen << 4);
-  framen ^= 1;
+  dma_memcpy16(&MEM_OAM[0], fstate.objs, fstate.objnum * 4);
+  dma_memset16(&MEM_OAM[fstate.objnum*4], 0, 256 - fstate.objnum*2);  // Clear unused objects
+  REG_DISPCNT = (REG_DISPCNT & ~0x10) | (fstate.framen << 4);
+  fstate.framen ^= 1;
 }

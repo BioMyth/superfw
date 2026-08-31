@@ -58,7 +58,7 @@ static menuoption UiSetMenuOpts[] = {
   },
   {
     MSG_UIS_SAVE,
-    Save,
+    Button,
     0,
     NULL,
     // false,
