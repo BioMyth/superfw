@@ -34,7 +34,7 @@ enum settingsOptions{
   DefsSavePol,
   DefsPrefDS,
   SettSave,
-  SettMAX
+  SettMAX = SettSave
 };
 
 static void  rtcRenderCallback(char *tmpbuf, uint16_t buffsize){
