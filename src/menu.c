@@ -953,47 +953,8 @@ static void flashbrowser_reload() {
   #endif
 }
 
-// Guess the file type based on the file name.
-static unsigned guessicon(const char *path) {
-  unsigned l = strlen(path);
-  if (l < 4)
-    return ICON_BINFILE;
-
-  if (!strcasecmp(&path[l-4], ".gba"))
-    return ICON_GBACART;
-  else if (!strcasecmp(&path[l-3], ".gb"))
-    return ICON_GBCART;
-  else if (!strcasecmp(&path[l-4], ".gbc"))
-    return ICON_GBCCART;
-  else if (!strcasecmp(&path[l-4], ".nes"))
-    return ICON_NESCART;
-  else if (!strcasecmp(&path[l-4], ".sms"))
-    return ICON_SMSCART;
-  else if (!strcasecmp(&path[l-3], ".fw"))
-    return ICON_UPDFILE;
-
-  return ICON_BINFILE;
-}
 
 
-void render_game_row(volatile uint8_t *frame, char *fn, unsigned row, bool selected, uint32_t sz) {
-  unsigned int szstrwidth = 0;
-  if (sz){
-    // Animate the row entries if they are too long!
-    char szstr[16];
-    human_size(szstr, sizeof(szstr), sz);
-    draw_rightj_text(szstr, frame, SCREEN_WIDTH - 2, (1 + row) * 16);
-    szstrwidth = font_width(szstr) + 2;
-  }
-  render_icon(2, (row+1)*16, guessicon(fn));
-  // Animate the row entries if they are too long!
-  if (selected)
-    draw_text_ovf_rotate(fn, frame, 20, (1 + row) * 16,
-                          SCREEN_WIDTH - 24 - szstrwidth, &smenu.anim_state);
-  else
-    draw_text_ovf(fn, frame, 20, (1 + row) * 16, 
-      SCREEN_WIDTH - 24 - szstrwidth);
-}
 
 void render_recent(volatile uint8_t *frame) {
   render_bar_fs(frame, (smenu.recent.selector - smenu.recent.seloff + 1)*16);
@@ -1005,7 +966,7 @@ void render_recent(volatile uint8_t *frame) {
 
     t_rentry *e = &sdr_state->rentries[smenu.recent.seloff + i];
     char *fn = &e->fpath[e->fname_offset];
-    render_game_row(frame, fn, i, i == smenu.recent.selector - smenu.recent.seloff, 0);
+    render_browser_row(frame, fn, 0, i, i == smenu.recent.selector - smenu.recent.seloff, 0, &smenu.anim_state);
   }
 }
 
@@ -1024,11 +985,14 @@ void render_flashbrowser(volatile uint8_t *frame) {
         break;
 
       const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.seloff + i];
-      render_game_row(
-        frame, &e->game_name[e->bnoffset],
+      render_browser_row(
+        frame,
+        &e->game_name[e->bnoffset],
+        0,
         i,
         i == smenu.fbrowser.selector - smenu.fbrowser.seloff, 
-        e->numblks * NOR_BLOCK_SIZE
+        e->numblks * NOR_BLOCK_SIZE,
+        &smenu.anim_state
       );
     }
   }
@@ -1056,26 +1020,18 @@ void render_browser(volatile uint8_t *frame) {
       if (smenu.browser.seloff + i >= smenu.browser.dispentries)
         break;
 
-      char szstr[16] = {0};
       t_centry *e = sdr_state->fileorder[smenu.browser.seloff + i];
 
-      unsigned iconidx = (e->attr & AM_HID || e->fname[0] == '.') ? ((e->attr & AM_DIR) ? ICON_HFOLDER : ICON_HFILE) :
-                         (e->attr & AM_DIR) ? ICON_FOLDER :
-                         guessicon(e->fname);
 
-      render_icon(2, (i+1)*16, iconidx);
-
-      if (!(e->attr & AM_DIR)) {
-        human_size(szstr, sizeof(szstr), e->filesize);
-        draw_rightj_text(szstr, frame, SCREEN_WIDTH - 2, (1 + i) * 16);
-      }
-
-      // Animate the row entries if they are too long!
-      if (i == smenu.browser.selector - smenu.browser.seloff)
-        draw_text_ovf_rotate(e->fname, frame, 20, (1 + i) * 16,
-                             SCREEN_WIDTH - 26 - font_width(szstr), &smenu.anim_state);
-      else
-        draw_text_ovf(e->fname, frame, 20, (1 + i) * 16, SCREEN_WIDTH - 26 - font_width(szstr));
+      render_browser_row(
+        frame,
+        e->fname,
+        e->attr,
+        i,
+        i == smenu.browser.selector - smenu.browser.seloff,
+        e->filesize,
+        &smenu.anim_state
+      );
     }
   }
 
@@ -2536,8 +2492,10 @@ static void keypress_menu_uisettings(unsigned newkeys, uint16_t keypresses) {
       menu_theme = MIN(THEME_COUNT - 1, menu_theme + 1);
     else if (smenu.uiset.selector == UiSettASpd)
       anim_speed = MIN(animspd_cnt - 1, anim_speed + 1);
-    else if (smenu.uiset.selector == UiSettHid)
+    else if (smenu.uiset.selector == UiSettHid){
       hide_hidden ^= 1;
+      browser_reload_filter();
+    }
     else if (smenu.uiset.selector == UiSettRect)
       recent_menu ^= 1;
     else if (smenu.uiset.selector == UiSettLang)

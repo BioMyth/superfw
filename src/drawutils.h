@@ -5,6 +5,7 @@
 #include "common.h"
 #include "gbahw.h"
 #include "util.h"
+#include "res/icons.h"
 
 #include "fonts/font_render.h"
 
@@ -49,7 +50,7 @@ static inline bool push_sprite(oamobj_t sprite) {
     return false;
   fstate.objs[fstate.objnum++] = sprite;
   return true;
-} 
+}
 
 static inline void render_icon(unsigned x, unsigned y, unsigned iconn) { 
   push_sprite((oamobj_t){
@@ -72,6 +73,7 @@ static inline void render_icon_trans(unsigned x, unsigned y, unsigned iconn) {
     .tn = 8 * iconn + 512
   });
 }
+
 
 // Split into two functions since one can be unrolled
 static inline void render_bar_fs(volatile uint8_t *frame, unsigned y) {
@@ -232,6 +234,54 @@ static void draw_progress_bar(unsigned done, unsigned total) {
   REG_DISPCNT = (REG_DISPCNT & ~0x10) | (fstate.framen << 4);
   fstate.framen ^= 1;
 }
+
+// Guess the file type based on the file name.
+static unsigned guessicon(const char *path) {
+  unsigned l = strlen(path);
+  if (l < 4)
+    return ICON_BINFILE;
+
+  if (!strcasecmp(&path[l-4], ".gba"))
+    return ICON_GBACART;
+  else if (!strcasecmp(&path[l-3], ".gb"))
+    return ICON_GBCART;
+  else if (!strcasecmp(&path[l-4], ".gbc"))
+    return ICON_GBCCART;
+  else if (!strcasecmp(&path[l-4], ".nes"))
+    return ICON_NESCART;
+  else if (!strcasecmp(&path[l-4], ".sms"))
+    return ICON_SMSCART;
+  else if (!strcasecmp(&path[l-3], ".fw"))
+    return ICON_UPDFILE;
+
+  return ICON_BINFILE;
+}
+
+void render_browser_row(volatile uint8_t *frame, char *fn, uint16_t attr, unsigned row, bool selected, uint32_t sz, unsigned int *franim) {
+  unsigned int szstrwidth = 0;
+  if (sz && !(attr & AM_DIR)){
+    // Animate the row entries if they are too long!
+    char szstr[16];
+    human_size(szstr, sizeof(szstr), sz);
+    draw_rightj_text(szstr, frame, SCREEN_WIDTH - 2, (1 + row) * 16);
+    szstrwidth = font_width(szstr) + 2;
+  }
+  unsigned int icon;
+  if (attr & AM_HID || fn[0] == '.')
+    icon = (attr & AM_DIR ? ICON_HFOLDER : ICON_HFILE);
+  else
+    icon = (attr & AM_DIR ? ICON_FOLDER : guessicon(fn));
+
+  render_icon(2, (row+1)*16, icon);
+  // Animate the row entries if they are too long!
+  if (selected)
+    draw_text_ovf_rotate(fn, frame, 20, (1 + row) * 16,
+                          SCREEN_WIDTH - 24 - szstrwidth, franim);
+  else
+    draw_text_ovf(fn, frame, 20, (1 + row) * 16, 
+      SCREEN_WIDTH - 24 - szstrwidth);
+}
+
 
 void menu_flip() {
   /* Copy icons directly instead of iterating */

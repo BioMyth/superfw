@@ -1,3 +1,4 @@
+#pragma once
 enum {
  ICON_FOLDER,
  ICON_BINFILE,
