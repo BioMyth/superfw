@@ -71,19 +71,18 @@ static inline void render_setting_row(volatile uint8_t *frame, const char *title
 
 void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
   char tmpbuf[TMP_BUF_SIZE];
+  uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
   
-  const uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
+  unsigned selector = *menu->selector;
+
   // Odd number round up, e.g. 5 -> we want 3
-  const uint8_t halfnumrows = numrows / 2;
+  uint8_t halfnumrows = numrows / 2;
+  
+  bool scroll = menu->optionCount > numrows;
+  bool lastpage = (menu->optionCount - selector - 1) <= halfnumrows;
+  bool firstpage = selector <= halfnumrows;
 
-
-  const uint8_t selector = *menu->selector;
-
-
-  const bool scroll = menu->optionCount > numrows;
-  const bool firstpage = selector > halfnumrows;
-  const bool lastpage = menu->optionCount - selector <= halfnumrows;
-
+  
   uint8_t offy = (scroll ? TABS_HEIGHT + 7 : TABS_HEIGHT);
 
 
