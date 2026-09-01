@@ -75,6 +75,7 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
   // Odd number round up, e.g. 5 -> we want 3
   uint8_t halfnumrows = numrows / 2;
   bool scroll = menu->optionCount > numrows;
+  bool lastpage = menu->optionCount - selector <= halfnumrows;
   
   uint8_t offy = (scroll ? TABS_HEIGHT + 7 : TABS_HEIGHT);
 
@@ -82,16 +83,16 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
 
   if (scroll && selector > halfnumrows)
     draw_central_text("⯅", frame, SCREEN_WIDTH / 2, 15);
-  if (scroll && selector <= menu->optionCount - halfnumrows)
-    draw_central_text("⯆", frame, SCREEN_WIDTH / 2, 15 + ROW_HEIGHT * numrows);//125);
+  if (scroll && !lastpage)
+    draw_central_text("⯆", frame, SCREEN_WIDTH / 2, ROW_HEIGHT * (numrows + 1));//125);
 
   uint8_t baseopt;
   // If we are in the first half of the first page or there aren't enough rows to scroll
   if (selector < halfnumrows || !scroll)
     baseopt = 0;
   // If we are in the second half of the last page
-  else if (menu->optionCount - selector <= halfnumrows) 
-    baseopt = menu->optionCount - numrows + 1;
+  else if (lastpage) 
+    baseopt = menu->optionCount - numrows;
   else 
     baseopt = selector - halfnumrows;
 
