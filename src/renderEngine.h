@@ -11,7 +11,8 @@
 
 #define ROW_HEIGHT 20
 
-#define ROW_COUNT (SCREEN_HEIGHT - TABS_HEIGHT)/ ROW_HEIGHT
+#define ROW_COUNT 6
+//(SCREEN_HEIGHT - TABS_HEIGHT)/ ROW_HEIGHT
 //6
 
 // First entries reserved for the logo palette.
@@ -72,8 +73,8 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
   char tmpbuf[TMP_BUF_SIZE];
   uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
   // Odd number round up, e.g. 5 -> we want 3
-  uint8_t halfnumrows = (numrows + 1 ) / 2;
-  bool scroll = menu->optionCount >= numrows;
+  uint8_t halfnumrows = numrows / 2;
+  bool scroll = menu->optionCount > numrows;
   
   uint8_t offy = (scroll ? TABS_HEIGHT + 7 : TABS_HEIGHT);
 
@@ -81,16 +82,16 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
 
   if (scroll && selector > halfnumrows)
     draw_central_text("⯅", frame, SCREEN_WIDTH / 2, 15);
-  if (scroll && selector < menu->optionCount - halfnumrows)
-    draw_central_text("⯆", frame, SCREEN_WIDTH / 2, 15 + ROW_HEIGHT * (numrows + 1) );//125);
+  if (scroll && selector <= menu->optionCount - halfnumrows)
+    draw_central_text("⯆", frame, SCREEN_WIDTH / 2, 15 + ROW_HEIGHT * numrows);//125);
 
   uint8_t baseopt;
   // If we are in the first half of the first page or there aren't enough rows to scroll
   if (selector < halfnumrows || !scroll)
     baseopt = 0;
   // If we are in the second half of the last page
-  else if (menu->optionCount - selector < halfnumrows) 
-    baseopt = menu->optionCount - numrows;
+  else if (menu->optionCount - selector <= halfnumrows) 
+    baseopt = menu->optionCount - numrows + 1;
   else 
     baseopt = selector - halfnumrows;
 
@@ -101,7 +102,8 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
   // Render before text rendering occurrs
   if (menu->options[*menu->selector].type != Button)
     render_bar_fs(frame, offy + (selector - baseopt) * ROW_HEIGHT);
-
+  // Add one to option count for reasons
+  // TODO: Update code so the max is different from save button index 
   for (uint8_t row = 0; row < MIN(numrows, menu->optionCount); row++)
   {
     uint16_t curropt = baseopt + row;

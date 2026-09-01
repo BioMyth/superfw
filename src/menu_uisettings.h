@@ -6,13 +6,13 @@
 #include "menustate.h"
 
 typedef enum UiSetEnum{
-  UiSetTheme = 0,
-  UiSetLang  = 1,
-  UiSetRect  = 2,
-  UiSetASpd  = 3,
-  UiSetHid   = 4,
-  UiSetSave  = 5,
-  UiSetMAX   = 5,
+  UiSettTheme,
+  UiSettLang,
+  UiSettRect,
+  UiSettASpd,
+  UiSettHid,
+  UiSettSave,
+  UiSettMAX,
 } UiSetEnum;
 
 static const menuoption_t UiSetMenuOpts[] = {
@@ -68,7 +68,7 @@ static const menuoption_t UiSetMenuOpts[] = {
 
 const menu_t uiSetMenu = {
       .selector = &smenu.uiset.selector,
-      .optionCount = UiSetMAX,
+      .optionCount = UiSettMAX,
       .options = UiSetMenuOpts,
       .helpCallback = NULL
 };

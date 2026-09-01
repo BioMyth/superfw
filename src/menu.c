@@ -976,6 +976,17 @@ static unsigned guessicon(const char *path) {
 }
 
 
+void render_game_row(volatile uint8_t *frame, char *fn, unsigned row, bool selected) {
+
+    render_icon(2, (row+1)*16, guessicon(fn));
+    // Animate the row entries if they are too long!
+    if (selected)
+      draw_text_ovf_rotate(fn, frame, 20, (1 + row) * 16,
+                           SCREEN_WIDTH - 24, &smenu.anim_state);
+    else
+      draw_text_ovf(fn, frame, 20, (1 + row) * 16, SCREEN_WIDTH - 24);
+}
+
 void render_recent(volatile uint8_t *frame) {
   render_bar_fs(frame, (smenu.recent.selector - smenu.recent.seloff + 1)*16);
 
@@ -986,14 +997,7 @@ void render_recent(volatile uint8_t *frame) {
 
     t_rentry *e = &sdr_state->rentries[smenu.recent.seloff + i];
     char *fn = &e->fpath[e->fname_offset];
-    render_icon(2, (i+1)*16, guessicon(fn));
-
-    // Animate the row entries if they are too long!
-    if (i == smenu.recent.selector - smenu.recent.seloff)
-      draw_text_ovf_rotate(fn, frame, 20, (1 + i) * 16,
-                           SCREEN_WIDTH - 24, &smenu.anim_state);
-    else
-      draw_text_ovf(fn, frame, 20, (1 + i) * 16, SCREEN_WIDTH - 24);
+    render_game_row(frame, fn, i, i == smenu.recent.selector - smenu.recent.seloff);
   }
 }
 
@@ -2428,9 +2432,9 @@ static void keypress_menu_settings(unsigned newkeys, uint16_t keypresses) {
     }
   }
   if (newkeys & KEY_BUTTDOWN){
-    smenu.set.selector = MIN(SettMAX, smenu.set.selector + keypresses);
+    smenu.set.selector = MIN(SettMAX - 1, smenu.set.selector + keypresses);
     if (smenu.menu_tab == MENUTAB_SETTINGS && (smenu.set.selector == SettTitle1 || smenu.set.selector == SettTitle2)){
-      smenu.set.selector = MIN(SettMAX, smenu.set.selector + 1);
+      smenu.set.selector = MIN(SettMAX - 1, smenu.set.selector + 1);
     }
   }
   if (newkeys & KEY_BUTTLEFT) {
@@ -2514,33 +2518,33 @@ static void keypress_menu_uisettings(unsigned newkeys, uint16_t keypresses) {
   if (newkeys & KEY_BUTTUP)
     smenu.uiset.selector = MAX(0, smenu.uiset.selector - keypresses);
   if (newkeys & KEY_BUTTDOWN)
-    smenu.uiset.selector = MIN(UiSetMAX, smenu.uiset.selector + keypresses);
+    smenu.uiset.selector = MIN(UiSettMAX - 1, smenu.uiset.selector + keypresses);
   if (newkeys & KEY_BUTTLEFT) {
-    if (smenu.uiset.selector == UiSetTheme)
+    if (smenu.uiset.selector == UiSettTheme)
       menu_theme = menu_theme ? menu_theme - 1 : 0;
-    else if (smenu.uiset.selector == UiSetASpd)
+    else if (smenu.uiset.selector == UiSettASpd)
       anim_speed = anim_speed ? anim_speed - 1 : 0;
-    else if (smenu.uiset.selector == UiSetHid)
+    else if (smenu.uiset.selector == UiSettHid)
       hide_hidden ^= 1;
-    else if (smenu.uiset.selector == UiSetRect)
+    else if (smenu.uiset.selector == UiSettRect)
       recent_menu ^= 1;
-    else if (smenu.uiset.selector == UiSetLang)
+    else if (smenu.uiset.selector == UiSettLang)
       lang_id = (lang_id + LANG_COUNT - 1) % LANG_COUNT;
   }
   if (newkeys & KEY_BUTTRIGHT) {
-    if (smenu.uiset.selector == UiSetTheme)
+    if (smenu.uiset.selector == UiSettTheme)
       menu_theme = MIN(THEME_COUNT - 1, menu_theme + 1);
-    else if (smenu.uiset.selector == UiSetASpd)
+    else if (smenu.uiset.selector == UiSettASpd)
       anim_speed = MIN(animspd_cnt - 1, anim_speed + 1);
-    else if (smenu.uiset.selector == UiSetHid)
+    else if (smenu.uiset.selector == UiSettHid)
       hide_hidden ^= 1;
-    else if (smenu.uiset.selector == UiSetRect)
+    else if (smenu.uiset.selector == UiSettRect)
       recent_menu ^= 1;
-    else if (smenu.uiset.selector == UiSetLang)
+    else if (smenu.uiset.selector == UiSettLang)
       lang_id = (lang_id + 1) % LANG_COUNT;
   }
 
-  if (newkeys & KEY_BUTTA && smenu.uiset.selector == UiSetSave) {
+  if (newkeys & KEY_BUTTA && smenu.uiset.selector == UiSettSave) {
     smenu.uiset.selector = 0;
     if (save_ui_settings())
       spop.alert_msg = msgs[lang_id][MSG_OK_SETSAVE];
