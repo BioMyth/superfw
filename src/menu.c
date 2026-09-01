@@ -976,15 +976,23 @@ static unsigned guessicon(const char *path) {
 }
 
 
-void render_game_row(volatile uint8_t *frame, char *fn, unsigned row, bool selected) {
-
-    render_icon(2, (row+1)*16, guessicon(fn));
+void render_game_row(volatile uint8_t *frame, char *fn, unsigned row, bool selected, uint32_t sz) {
+  unsigned int szstrwidth = 0;
+  if (sz){
     // Animate the row entries if they are too long!
-    if (selected)
-      draw_text_ovf_rotate(fn, frame, 20, (1 + row) * 16,
-                           SCREEN_WIDTH - 24, &smenu.anim_state);
-    else
-      draw_text_ovf(fn, frame, 20, (1 + row) * 16, SCREEN_WIDTH - 24);
+    char szstr[16];
+    human_size(szstr, sizeof(szstr), sz);
+    draw_rightj_text(szstr, frame, SCREEN_WIDTH - 2, (1 + row) * 16);
+    szstrwidth = font_width(szstr) + 2;
+  }
+  render_icon(2, (row+1)*16, guessicon(fn));
+  // Animate the row entries if they are too long!
+  if (selected)
+    draw_text_ovf_rotate(fn, frame, 20, (1 + row) * 16,
+                          SCREEN_WIDTH - 24 - szstrwidth, &smenu.anim_state);
+  else
+    draw_text_ovf(fn, frame, 20, (1 + row) * 16, 
+      SCREEN_WIDTH - 24 - szstrwidth);
 }
 
 void render_recent(volatile uint8_t *frame) {
@@ -997,7 +1005,7 @@ void render_recent(volatile uint8_t *frame) {
 
     t_rentry *e = &sdr_state->rentries[smenu.recent.seloff + i];
     char *fn = &e->fpath[e->fname_offset];
-    render_game_row(frame, fn, i, i == smenu.recent.selector - smenu.recent.seloff);
+    render_game_row(frame, fn, i, i == smenu.recent.selector - smenu.recent.seloff, 0);
   }
 }
 
@@ -1016,20 +1024,12 @@ void render_flashbrowser(volatile uint8_t *frame) {
         break;
 
       const t_flash_game_entry *e = &sdr_state->nordata.games[smenu.fbrowser.seloff + i];
-      render_icon(2, (i+1)*16, ICON_GBACART);
-
-      // Animate the row entries if they are too long!
-      char szstr[16];
-      human_size(szstr, sizeof(szstr), e->numblks * NOR_BLOCK_SIZE);
-      draw_rightj_text(szstr, frame, SCREEN_WIDTH - 2, (1 + i) * 16);
-
-      // Animate the row entries if they are too long!
-      const char *romname = &e->game_name[e->bnoffset];
-      if (i == smenu.fbrowser.selector - smenu.fbrowser.seloff)
-        draw_text_ovf_rotate(romname, frame, 20, (1 + i) * 16,
-                             SCREEN_WIDTH - 26 - font_width(szstr), &smenu.anim_state);
-      else
-        draw_text_ovf(romname, frame, 20, (1 + i) * 16, SCREEN_WIDTH - 26 - font_width(szstr));
+      render_game_row(
+        frame, &e->game_name[e->bnoffset],
+        i,
+        i == smenu.fbrowser.selector - smenu.fbrowser.seloff, 
+        e->numblks * NOR_BLOCK_SIZE
+      );
     }
   }
 
@@ -1059,7 +1059,7 @@ void render_browser(volatile uint8_t *frame) {
       char szstr[16] = {0};
       t_centry *e = sdr_state->fileorder[smenu.browser.seloff + i];
 
-      unsigned iconidx = (e->attr & AM_HID) ? ((e->attr & AM_DIR) ? ICON_HFOLDER : ICON_HFILE) :
+      unsigned iconidx = (e->attr & AM_HID || e->fname[0] == '.') ? ((e->attr & AM_DIR) ? ICON_HFOLDER : ICON_HFILE) :
                          (e->attr & AM_DIR) ? ICON_FOLDER :
                          guessicon(e->fname);
 
