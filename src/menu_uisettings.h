@@ -15,7 +15,7 @@ typedef enum UiSetEnum{
   UiSetMAX   = 5,
 } UiSetEnum;
 
-static menuoption UiSetMenuOpts[] = {
+static const menuoption_t UiSetMenuOpts[] = {
   {
     MSG_UIS_THEME,
     IntScroll,
@@ -66,9 +66,9 @@ static menuoption UiSetMenuOpts[] = {
   }
 };
 
-static const menu uiSetMenu = {
-      &smenu.uiset.selector,
-      UiSetMAX,
-      UiSetMenuOpts,
-      NULL
+const menu_t uiSetMenu = {
+      .selector = &smenu.uiset.selector,
+      .optionCount = UiSetMAX,
+      .options = UiSetMenuOpts,
+      .helpCallback = NULL
 };

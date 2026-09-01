@@ -1,3 +1,5 @@
+#pragma once
+#include "common.h"
 enum TranslationID {
   MSG_BACKUP_I,
   MSG_BAD_SDRAM,

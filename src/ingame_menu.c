@@ -18,6 +18,7 @@
 
 #include <string.h>
 
+#include "common.h"
 #include "gbahw.h"
 #include "save.h"
 #include "util.h"
@@ -33,8 +34,8 @@
 
 #include "directsave.h"
 
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
+//#define MIN(a,b) ((a) < (b) ? (a) : (b))
+//#define MAX(a,b) ((a) > (b) ? (a) : (b))
 
 #define SAVESTATE_VERSION       0x00010000
 

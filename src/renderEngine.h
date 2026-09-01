@@ -4,6 +4,8 @@
 #include "common.h"
 #include "messages.h"
 #include "drawutils.h"
+#include "nanoprintf.h"
+#include "settings.h"
 
 #define ROW_COUNT 6
 
@@ -19,7 +21,7 @@
 #define IGM_PAL_BL      244
 #define SEL_COLOR       255
 
-typedef enum menuOptionType {
+typedef enum menuOptionType_e {
   Header,
   RTC,
   IntScroll,
@@ -32,9 +34,10 @@ typedef enum menuOptionType {
   Button
 } menuOptionType;
 
-typedef void (*menuoptioncallback)(char *tmpbuf);
+typedef void (*menuoptioncallback_t)(char *tmpbuf);
+typedef void (*menuhelpcallback_t)(volatile uint8_t *frame);
 
-typedef struct menuoption {
+typedef struct {
     /* Translation Id */
   uint32_t name;
   menuOptionType type;
@@ -42,15 +45,15 @@ typedef struct menuoption {
   uint32_t baseOption;
   uint8_t *selectedOption;
   // bool animate;
-  menuoptioncallback callback;
-} menuoption;
+  menuoptioncallback_t callback;
+} menuoption_t;
 
-typedef struct menu {
+typedef struct {
   int *selector;
   uint16_t optionCount;
-  menuoption *options;
-  void (*helpCallback)(volatile uint8_t *frame);
-} menu;
+  const menuoption_t *options;
+  menuhelpcallback_t helpCallback;
+} menu_t;
 
 
 static inline void render_setting_row(volatile uint8_t *frame, const char *title, const char *value, uint16_t optcnt, uint8_t offy) {
@@ -59,7 +62,7 @@ static inline void render_setting_row(volatile uint8_t *frame, const char *title
     draw_central_text(value, frame, 170, offy + rowh * optcnt);
 }
 
-void renderMenu(volatile uint8_t *frame, const menu *menu) {
+void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
   char tmpbuf[128];
   uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
   // Odd number round up, e.g. 5 -> we want 3
@@ -95,7 +98,7 @@ void renderMenu(volatile uint8_t *frame, const menu *menu) {
     uint16_t curropt = baseopt + offopt;
     if (curropt >= menu->optionCount)
       break;
-    menuoption *selopt = &menu->options[baseopt + offopt];
+    const menuoption_t *selopt = &menu->options[baseopt + offopt];
     switch (selopt->type)
     {
     case Header:
@@ -125,6 +128,7 @@ void renderMenu(volatile uint8_t *frame, const menu *menu) {
       render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
       break;
     case Button:
+      // Buttons handle their own highlighting in the button box rendering
       draw_button_box(frame, 20, 220, 132, 152, selector == (baseopt + offopt));
       draw_central_text(msgs[lang_id][selopt->name], frame, 120, 134);
       break;
@@ -134,10 +138,8 @@ void renderMenu(volatile uint8_t *frame, const menu *menu) {
   }
 
   // Render the highlight bar if not on save
-  // if (smenu.uiset.selector != UiSetSave)
-    // #pragma GCC unroll 15
-    for (unsigned i = 0; i < 15; i++)
-      render_icon_trans(i * 16, offy + (selector - baseopt) * rowh, 63);
+  if (menu->options[*menu->selector].type != Button)
+    render_bar_fs(offy + (selector - baseopt) * rowh);
   if (menu->helpCallback != NULL)
     menu->helpCallback(frame);
 }

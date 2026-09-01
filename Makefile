@@ -226,5 +226,6 @@ upkr.elf:	tools/upkr.cc
 	g++ -o $@ $< -O3 -ffast-math
 
 clean:
-	rm -f ldscripts/*.i superfw-*.fw *.gba *.elf *.payload *.map res/*.comp emu/*.comp *.comp src/menu_messages.h src/messages_data.h
-
+	rm -f ldscripts/*.i superfw-*.fw *.gba *.elf *.payload *.map res/*.comp \
+  rm -f *.comp src/menu_messages.h src/messages_data.h
+  # rm -f emu/*.comp # Get really annoyed at how long it takes

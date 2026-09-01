@@ -1,11 +1,11 @@
 #pragma once
 
-#include "../menustate.h"
-#include "../common.h"
-#include "../settings.h"
-#include "../nanoprintf.h"
-#include "../messages.h"
-#include "../renderEngine.h"
+#include "menustate.h"
+#include "common.h"
+#include "settings.h"
+#include "nanoprintf.h"
+#include "messages.h"
+#include "renderEngine.h"
 
 
 enum settingsOptions{
@@ -70,7 +70,7 @@ static void saveStatePathRenderCallback(char *tmpbuf){
 
 
 
-static menuoption SetMenuOpts[] = {
+static const menuoption_t SetMenuOpts[] = {
   {
     MSG_SET_TITL1,
     Header,
@@ -287,9 +287,9 @@ void uiSetRenderHelp(volatile uint8_t *frame) {
   }
 }
 
-const menu globalSetMenu = {
-      &smenu.set.selector,
-      SettMAX,
-      SetMenuOpts,
-      uiSetRenderHelp
+const menu_t globalSetMenu = {
+      .selector = &smenu.set.selector,
+      .optionCount = SettMAX,
+      .options = SetMenuOpts,
+      .helpCallback = uiSetRenderHelp
 };

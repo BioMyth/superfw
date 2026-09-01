@@ -1,3 +1,5 @@
+#pragma once
+#include "common.h"
 enum TranslationID {
   IMENU_CANCEL,
   IMENU_FRZRTC,

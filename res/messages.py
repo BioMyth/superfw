@@ -339,7 +339,8 @@ elif len(sys.argv) > 1 and sys.argv[1] == "h":
           strlist[k] = (v, c)
         tmp[k] = (v, c)
     strall[mname] = tmp
-
+  print("#pragma once")
+  print("#include \"common.h\"")
   print("enum TranslationID {")
   for k, (_, c) in sorted(strlist.items()):
     if c:

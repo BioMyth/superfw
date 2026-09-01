@@ -76,7 +76,7 @@ static inline void render_icon_trans(unsigned x, unsigned y, unsigned iconn) {
 // Split into two functions since one can be unrolled
 static inline void render_bar_fs(unsigned y) {
   // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
-  #pragma GCC UNROLL 15
+  #pragma GCC unroll 15
   for (unsigned i = 0; i < 15; i ++)
     render_icon_trans(i * 16, y, 63);
 }

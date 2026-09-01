@@ -44,8 +44,8 @@
 #include "renderEngine.h"
 #include "menustate.h"
 
-#include "menus/settings.h"
-#include "menus/uisettings.h"
+#include "menu_settings.h"
+#include "menu_uisettings.h"
 
 #include "res/icons.h"
 #include "res/logo.h"
@@ -1389,12 +1389,12 @@ void render_rtcpop(volatile uint8_t *frame) {
 }
 
 
-inline void render_settings(volatile uint8_t *frame) {
+void render_settings(volatile uint8_t *frame) {
   renderMenu(frame, &globalSetMenu);
 }
 
 
-inline void render_ui_settings(volatile uint8_t *frame) {
+void render_ui_settings(volatile uint8_t *frame) {
   renderMenu(frame, &uiSetMenu);
 }
 
