@@ -71,24 +71,30 @@ static inline void render_setting_row(volatile uint8_t *frame, const char *title
 
 void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
   char tmpbuf[TMP_BUF_SIZE];
-  uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
-  // Odd number round up, e.g. 5 -> we want 3
-  uint8_t halfnumrows = numrows / 2;
-  bool scroll = menu->optionCount > numrows;
-  bool lastpage = menu->optionCount - selector <= halfnumrows;
   
+  const uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
+  // Odd number round up, e.g. 5 -> we want 3
+  const uint8_t halfnumrows = numrows / 2;
+
+
+  const uint8_t selector = *menu->selector;
+
+
+  const bool scroll = menu->optionCount > numrows;
+  const bool firstpage = selector > halfnumrows;
+  const bool lastpage = menu->optionCount - selector <= halfnumrows;
+
   uint8_t offy = (scroll ? TABS_HEIGHT + 7 : TABS_HEIGHT);
 
-  unsigned selector = *menu->selector;
 
-  if (scroll && selector > halfnumrows)
+  if (scroll && !firstpage)
     draw_central_text("⯅", frame, SCREEN_WIDTH / 2, 15);
   if (scroll && !lastpage)
     draw_central_text("⯆", frame, SCREEN_WIDTH / 2, ROW_HEIGHT * (numrows + 1));//125);
 
   uint8_t baseopt;
   // If we are in the first half of the first page or there aren't enough rows to scroll
-  if (selector < halfnumrows || !scroll)
+  if (firstpage || !scroll)
     baseopt = 0;
   // If we are in the second half of the last page
   else if (lastpage) 
@@ -117,7 +123,7 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
       draw_central_text(msgs[lang_id][selopt->name], frame, SCREEN_WIDTH/2, offy + ROW_HEIGHT * row);
       break;
     case TxtScroll:
-      char *msg = msgs[lang_id][selopt->baseOption + (selopt->selectedOption == NULL ? 0 : *selopt->selectedOption)];
+      const char *msg = msgs[lang_id][selopt->baseOption + (selopt->selectedOption == NULL ? 0 : *selopt->selectedOption)];
       if (msg[0] != '<'){
         npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", 
           msg);
