@@ -227,5 +227,5 @@ upkr.elf:	tools/upkr.cc
 
 clean:
 	rm -f ldscripts/*.i superfw-*.fw *.gba *.elf *.payload *.map res/*.comp \
-  rm -f *.comp src/menu_messages.h src/messages_data.h
-  # rm -f emu/*.comp # Get really annoyed at how long it takes
+  rm -f src/menu_messages.h src/messages_data.h
+  # rm -f *.comp emu/*.comp # Get really annoyed at how long it takes

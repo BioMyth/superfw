@@ -993,7 +993,7 @@ void render_recent(volatile uint8_t *frame) {
     else
       draw_text_ovf(fn, frame, 20, (1 + i) * 16, SCREEN_WIDTH - 24);
   }
-  render_bar_fs((smenu.recent.selector - smenu.recent.seloff + 1)*16);
+  render_bar_fs(frame, (smenu.recent.selector - smenu.recent.seloff + 1)*16);
 }
 
 #ifdef SUPPORT_NORGAMES
@@ -1025,7 +1025,7 @@ void render_flashbrowser(volatile uint8_t *frame) {
       else
         draw_text_ovf(romname, frame, 20, (1 + i) * 16, SCREEN_WIDTH - 26 - font_width(szstr));
     }
-    render_bar_fs((smenu.fbrowser.selector - smenu.fbrowser.seloff + 1)*16);
+    render_bar_fs(frame, (smenu.fbrowser.selector - smenu.fbrowser.seloff + 1)*16);
   }
 
   char tmp[32], tmp1[32], tmp2[32];
@@ -1071,7 +1071,7 @@ void render_browser(volatile uint8_t *frame) {
       else
         draw_text_ovf(e->fname, frame, 20, (1 + i) * 16, SCREEN_WIDTH - 26 - font_width(szstr));
     }
-    render_bar_fs((smenu.browser.selector - smenu.browser.seloff + 1)*16);
+    render_bar_fs(frame, (smenu.browser.selector - smenu.browser.seloff + 1)*16);
   }
 
   // Draw path, cut left part if necessary.
@@ -1462,7 +1462,7 @@ void render_tools(volatile uint8_t *frame) {
   smenu.anim_state = (smenu.anim_state + 1) & 255;
   draw_central_text("▸", frame, 11 + (smenu.anim_state >> 6), 26 + 22 * smenu.tools.selector);
 
-  render_bar_fs(26 + smenu.tools.selector * 22);
+  render_bar_fs(frame, 26 + smenu.tools.selector * 22);
 }
 
 void reload_theme(unsigned thnum) {

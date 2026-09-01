@@ -74,14 +74,18 @@ static inline void render_icon_trans(unsigned x, unsigned y, unsigned iconn) {
 }
 
 // Split into two functions since one can be unrolled
-static inline void render_bar_fs(unsigned y) {
+static inline void render_bar_fs(volatile uint8_t *frame, unsigned y) {
+  // TODO: Update this with direct memset like done for the top bar instead of sprite based
+  dma_memset16(&frame[SCREEN_WIDTH * y], dup8(FG_COLOR), SCREEN_WIDTH*16/2);
   // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
-  #pragma GCC unroll 15
-  for (unsigned i = 0; i < 15; i ++)
-    render_icon_trans(i * 16, y, 63);
+  // #pragma GCC unroll 15
+  // for (unsigned i = 0; i < 15; i ++)
+  //   render_icon_trans(i * 16, y, 63);
 }
 
 static inline void render_bar(unsigned startx, unsigned endx, unsigned y) {
+  // TODO: Update this with direct memset like done for the top bar instead of sprite based
+  //dma_memset16(&frame[SCREEN_WIDTH * y] + startx, dup8(FG_COLOR), SCREEN_WIDTH*16/2);
   // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
   for (unsigned i = 0; i < ((startx - endx) / 16); i ++)
     render_icon_trans(startx + (i * 16), y, 63);
