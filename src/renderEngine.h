@@ -97,6 +97,11 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
   // npf_snprintf(tmpbuf, sizeof(tmpbuf), " %u ", baseopt);
   // render_setting_row(frame, "baseopt", tmpbuf, 0);
   
+  // Render the highlight bar if not on a button
+  // Render before text rendering occurrs
+  if (menu->options[*menu->selector].type != Button)
+    render_bar_fs(frame, offy + (selector - baseopt) * ROW_HEIGHT);
+
   for (uint8_t row = 0; row < MIN(numrows, menu->optionCount); row++)
   {
     uint16_t curropt = baseopt + row;
@@ -153,9 +158,6 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
     }
   }
 
-  // Render the highlight bar if not on save
-  if (menu->options[*menu->selector].type != Button)
-    render_bar_fs(frame, offy + (selector - baseopt) * ROW_HEIGHT);
   if (menu->helpCallback != NULL)
     menu->helpCallback(frame);
 }

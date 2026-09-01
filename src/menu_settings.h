@@ -46,26 +46,26 @@ static void  rtcRenderCallback(char *tmpbuf, uint16_t buffsize){
 
 static void rtcSpeedRenderCallback(char *tmpbuf, uint16_t buffsize) {
   unsigned spdmsg = rtcspeed_default ? (MSG_UIS_SPD0 + rtcspeed_default - 1) : MSG_STILLRTC;
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][spdmsg]);
+  npf_snprintf(tmpbuf, buffsize, "< %s >", msgs[lang_id][spdmsg]);
 }
 
 static void hotkeyRenderCallback(char *tmpbuf, uint16_t buffsize){
-      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", hotkey_list[hotkey_combo].cname);
+      npf_snprintf(tmpbuf, buffsize, "< %s >", hotkey_list[hotkey_combo].cname);
 }
 
 static void savePathRenderCallback(char *tmpbuf, uint16_t buffsize){
   if (save_path_default == SaveRomName)
-    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_NEXTTO_ROM]);
+    npf_snprintf(tmpbuf, buffsize, "< %s >", msgs[lang_id][MSG_NEXTTO_ROM]);
   else
-    npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", save_paths[save_path_default]);
+    npf_snprintf(tmpbuf, buffsize, "< %s >", save_paths[save_path_default]);
 }
 
 static void savePathFlashRenderCallback(char *tmpbuf, uint16_t buffsize) {
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", save_paths[save_path_nor_default]);
+  npf_snprintf(tmpbuf, buffsize, "< %s >", save_paths[save_path_nor_default]);
 }
 
 static void saveStatePathRenderCallback(char *tmpbuf, uint16_t buffsize){
-  npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", savestates_paths_display[state_path_default]);
+  npf_snprintf(tmpbuf, buffsize, "< %s >", savestates_paths_display[state_path_default]);
 }
 
 
