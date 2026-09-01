@@ -21,6 +21,8 @@
 #define IGM_PAL_BL      244
 #define SEL_COLOR       255
 
+#define TMP_BUF_SIZE 128
+
 typedef enum menuOptionType_e {
   Header,
   RTC,
@@ -34,7 +36,7 @@ typedef enum menuOptionType_e {
   Button
 } menuOptionType;
 
-typedef void (*menuoptioncallback_t)(char *tmpbuf);
+typedef void (*menuoptioncallback_t)(char *tmpbuf, uint16_t bufsize);
 typedef void (*menuhelpcallback_t)(volatile uint8_t *frame);
 
 typedef struct {
@@ -63,7 +65,7 @@ static inline void render_setting_row(volatile uint8_t *frame, const char *title
 }
 
 void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
-  char tmpbuf[128];
+  char tmpbuf[TMP_BUF_SIZE];
   uint8_t numrows = (menu->helpCallback == NULL ? ROW_COUNT : ROW_COUNT - 1);
   // Odd number round up, e.g. 5 -> we want 3
   uint8_t halfnumrows = (numrows + 1 ) / 2;
@@ -105,9 +107,15 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
       draw_central_text(msgs[lang_id][selopt->name], frame, SCREEN_WIDTH/2, offy + rowh*offopt);
       break;
     case TxtScroll:
-      npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", 
-        msgs[lang_id][selopt->baseOption + (selopt->selectedOption == NULL ? 0 : *selopt->selectedOption)]);
+      char *msg = msgs[lang_id][selopt->baseOption + (selopt->selectedOption == NULL ? 0 : *selopt->selectedOption)];
+      if (msg[0] != '<'){
+        npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", 
+          msg);
         render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
+      }
+      else  {
+        render_setting_row(frame, msgs[lang_id][selopt->name], msg, offopt, offy);
+      }
       break;
     case IntScroll:
       npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %i >", *((uint8_t*) selopt->selectedOption));
@@ -124,7 +132,7 @@ void renderMenu(volatile uint8_t *frame, const menu_t *menu) {
           offopt, offy);
       break;
     case Callback:
-      selopt->callback(tmpbuf);
+      selopt->callback(tmpbuf, TMP_BUF_SIZE);
       render_setting_row(frame, msgs[lang_id][selopt->name], tmpbuf, offopt, offy);
       break;
     case Button:

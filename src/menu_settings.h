@@ -37,34 +37,34 @@ enum settingsOptions{
   SettMAX
 };
 
-static void  rtcRenderCallback(char *tmpbuf){
+static void  rtcRenderCallback(char *tmpbuf, uint16_t buffsize){
         t_dec_date d;
         timestamp2date(rtcvalue_default, &d);
-        npf_snprintf(tmpbuf, sizeof(tmpbuf), "20%02d/%02d/%02d %02d:%02d",
+        npf_snprintf(tmpbuf, buffsize, "20%02d/%02d/%02d %02d:%02d",
           d.year, d.month, d.day, d.hour, d.min);
 }
 
-static void rtcSpeedRenderCallback(char *tmpbuf) {
+static void rtcSpeedRenderCallback(char *tmpbuf, uint16_t buffsize) {
   unsigned spdmsg = rtcspeed_default ? (MSG_UIS_SPD0 + rtcspeed_default - 1) : MSG_STILLRTC;
   npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][spdmsg]);
 }
 
-static void hotkeyRenderCallback(char *tmpbuf){
+static void hotkeyRenderCallback(char *tmpbuf, uint16_t buffsize){
       npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", hotkey_list[hotkey_combo].cname);
 }
 
-static void savePathRenderCallback(char *tmpbuf){
+static void savePathRenderCallback(char *tmpbuf, uint16_t buffsize){
   if (save_path_default == SaveRomName)
     npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", msgs[lang_id][MSG_NEXTTO_ROM]);
   else
     npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", save_paths[save_path_default]);
 }
 
-static void savePathFlashRenderCallback(char *tmpbuf) {
+static void savePathFlashRenderCallback(char *tmpbuf, uint16_t buffsize) {
   npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", save_paths[save_path_nor_default]);
 }
 
-static void saveStatePathRenderCallback(char *tmpbuf){
+static void saveStatePathRenderCallback(char *tmpbuf, uint16_t buffsize){
   npf_snprintf(tmpbuf, sizeof(tmpbuf), "< %s >", savestates_paths_display[state_path_default]);
 }
 
