@@ -39,7 +39,7 @@
 #include "sha256.h"
 #include "supercard_driver.h"
 
-// #include "drawutils.h"
+#include "drawutils.h"
 
 #include "renderEngine.h"
 #include "menustate.h"

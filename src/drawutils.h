@@ -78,7 +78,7 @@ static inline void render_icon_trans(unsigned x, unsigned y, unsigned iconn) {
 // Split into two functions since one can be unrolled
 static inline void render_bar_fs(volatile uint8_t *frame, unsigned y) {
   // TODO: Update this with direct memset like done for the top bar instead of sprite based
-  dma_memset16(&frame[SCREEN_WIDTH * y], dup8(FG_COLOR), SCREEN_WIDTH*16/2);
+  dma_memset16(&frame[SCREEN_WIDTH * y], dup8(HI_COLOR), SCREEN_WIDTH*16/2);
   // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
   // #pragma GCC unroll 15
   // for (unsigned i = 0; i < 15; i ++)
@@ -87,9 +87,13 @@ static inline void render_bar_fs(volatile uint8_t *frame, unsigned y) {
 
 static inline void render_bar(unsigned startx, unsigned endx, unsigned y) {
   // TODO: Update this with direct memset like done for the top bar instead of sprite based
-  //dma_memset16(&frame[SCREEN_WIDTH * y] + startx, dup8(FG_COLOR), SCREEN_WIDTH*16/2);
+  //dma_memset16(&frame[SCREEN_WIDTH * y] + startx, dup8(HI_COLOR), SCREEN_WIDTH*16/2);
   // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
-  for (unsigned i = 0; i < ((startx - endx) / 16); i ++)
+  if (startx >= endx || y > SCREEN_HEIGHT || startx >= SCREEN_WIDTH)
+    return;
+  // Don't allow over-rendering
+  endx = MIN(endx, SCREEN_WIDTH);
+  for (unsigned i = 0; i < ((endx - startx) / 16); i ++)
     render_icon_trans(startx + (i * 16), y, 63);
 }
 
@@ -285,7 +289,9 @@ void render_browser_row(volatile uint8_t *frame, char *fn, uint16_t attr, unsign
 
 void menu_flip() {
   /* Copy icons directly instead of iterating */
-  dma_memcpy16(&MEM_OAM[0], fstate.objs, fstate.objnum * 4);
+  // Divide by 4 since memcpy32 copies 4 bytes at a time
+  dma_memcpy32(&MEM_OAM[0], fstate.objs, fstate.objnum * sizeof(oamobj_t)/4);
+  // dma_memcpy16(&MEM_OAM[0], fstate.objs, fstate.objnum * sizeof(oamobj_t)/2);
   dma_memset16(&MEM_OAM[fstate.objnum*4], 0, 256 - fstate.objnum*2);  // Clear unused objects
   REG_DISPCNT = (REG_DISPCNT & ~0x10) | (fstate.framen << 4);
   fstate.framen ^= 1;
