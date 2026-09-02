@@ -192,16 +192,20 @@ unsigned font_width_cap_space(const char *s, unsigned max_width, unsigned *outwi
   return bcnt;
 }
 
+// Handles writing 8 bit values into 16 bit buffers
 static inline void vram_write(uint8_t *buffer, uint8_t value) {
   uintptr_t dst = (uintptr_t)buffer;
+  // If the destination is odd, then we are writing into the second byte, so mask the first & combine
   if (dst & 1) {
     volatile uint16_t *b16 = (uint16_t*)&buffer[-1];
     *b16 = (value << 8) | (*b16 & 0xFF);
   } else {
+    // If the destination is even, then we are writing into the first byte, so mask the second byte & combine
     volatile uint16_t *b16 = (uint16_t*)buffer;
     *b16 = value | (*b16 & 0xFF00);
   }
 }
+// Curious if something naive of *buffer = value. I'm sure that doesn't work due to endians or smth
 
 // Special GBA routine: handles VRAM byte writes correctly
 // Renders some text in a framebuffer (8bit indexed color)

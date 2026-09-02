@@ -247,49 +247,42 @@ static const menuoption_t SetMenuOpts[] = {
 
 
 
-void uiSetRenderHelp(volatile uint8_t *frame) {
-  char tmp[128];
-  // Render bar below for help messge
-  dma_memset16(&frame[240*140], dup8(FG_COLOR), 240*20/2);
-
+void uiSetHelpCallback(char *tmpbuf, uint8_t selector) {
   if (smenu.set.selector == SettSaveLoc) {
     if (save_path_default == SaveRomName)
-      draw_text_ovf_rotate(msgs[lang_id][MSG_SAVE_TYPE_NR], frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+      strcpy(tmpbuf, msgs[lang_id][MSG_SAVE_TYPE_NR]);
     else {
-      npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_SAVE_TYPE_PT], save_paths[save_path_default]);
-      draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+      npf_snprintf(tmpbuf, TMP_BUF_SIZE, msgs[lang_id][MSG_SAVE_TYPE_PT], save_paths[save_path_default]);
     }
   }
   else if (smenu.set.selector == SettStateLoc) {
-    npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_STATE_TYPE_PT], savestates_paths[state_path_default]);
-    draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+    npf_snprintf(tmpbuf, TMP_BUF_SIZE, msgs[lang_id][MSG_STATE_TYPE_PT], savestates_paths[state_path_default]);
   }
   #ifdef SUPPORT_NORGAMES
   else if (smenu.set.selector == SettSaveLocNOR) {
-    npf_snprintf(tmp, sizeof(tmp), msgs[lang_id][MSG_SAVE_TYPE_PTX], save_paths[save_path_nor_default]);
-    draw_text_ovf_rotate(tmp, frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+    npf_snprintf(tmpbuf, TMP_BUF_SIZE, msgs[lang_id][MSG_SAVE_TYPE_PTX], save_paths[save_path_nor_default]);
   }
   #endif
   else {
-    unsigned help_msg = smenu.set.selector == SettBootType ? MSG_BOOT_TYPE_I0 + boot_bios_splash :
-                        smenu.set.selector == SettSaveBkp  ? MSG_BACKUP_I :
-                        smenu.set.selector == SettFastSD   ? MSG_FASTSD_I :
-                        smenu.set.selector == SettFastEWRAM? MSG_FASTEW_I :
-                        smenu.set.selector == DefsPatchEng ? MSG_PATCH_TYPE_I0 + patcher_default :
-                        smenu.set.selector == DefsLoadPol  ? MSG_DEF_LOADP_I0 + (autoload_default ^ 1) :
-                        smenu.set.selector == DefsSavePol  ? MSG_DEF_SAVEP_I0 + (autosave_default ^ 1) :
-                        smenu.set.selector == DefsPrefDS   ? MSG_LOADER_PREFDSI :
+    unsigned help_msg = selector == SettBootType ? MSG_BOOT_TYPE_I0 + boot_bios_splash :
+                        selector == SettSaveBkp  ? MSG_BACKUP_I :
+                        selector == SettFastSD   ? MSG_FASTSD_I :
+                        selector == SettFastEWRAM? MSG_FASTEW_I :
+                        selector == DefsPatchEng ? MSG_PATCH_TYPE_I0 + patcher_default :
+                        selector == DefsLoadPol  ? MSG_DEF_LOADP_I0 + (autoload_default ^ 1) :
+                        selector == DefsSavePol  ? MSG_DEF_SAVEP_I0 + (autosave_default ^ 1) :
+                        selector == DefsPrefDS   ? MSG_LOADER_PREFDSI :
                         #ifdef SUPPORT_NORGAMES
-                        smenu.set.selector == SettVerifyNOR ? MSG_VERNOR_I :
+                        selector == SettVerifyNOR ? MSG_VERNOR_I :
                         #endif
                         MSG_EMPTY;
-    draw_text_ovf_rotate(msgs[lang_id][help_msg], frame, 4, SCREEN_HEIGHT - 18, 232, &smenu.anim_state);
+    strcpy(tmpbuf, msgs[lang_id][help_msg]);
   }
 }
 
 const menu_t globalSetMenu = {
-      .selector = &smenu.set.selector,
-      .optionCount = SettMAX,
-      .options = SetMenuOpts,
-      .helpCallback = uiSetRenderHelp
+  .selector = &smenu.set.selector,
+  .optionCount = SettMAX,
+  .options = SetMenuOpts,
+  .bottCallback = uiSetHelpCallback
 };

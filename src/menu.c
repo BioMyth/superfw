@@ -46,6 +46,7 @@
 
 #include "menu_settings.h"
 #include "menu_uisettings.h"
+#include "menu_tools.h"
 
 #include "res/icons.h"
 #include "res/logo.h"
@@ -92,17 +93,7 @@ enum {
 #define FLASH_UNLOCK_KEYS      (KEY_BUTTDOWN|KEY_BUTTB|KEY_BUTTSTA)
 #define FLASH_GO_KEYS          (KEY_BUTTUP|KEY_BUTTL|KEY_BUTTR)
 
-enum {
-  ToolsSDRAMTest = 0,
-  ToolsSRAMTest,
-  ToolsBatteryTest,
-  ToolsSDBench,
-  ToolsFlashBak,
-  #ifdef SUPPORT_NORGAMES
-  ToolsFlashClr,
-  #endif
-  ToolsMAX,
-};
+
 
 
 enum {
@@ -957,7 +948,7 @@ static void flashbrowser_reload() {
 
 
 void render_recent(volatile uint8_t *frame) {
-  render_bar_fs(frame, (smenu.recent.selector - smenu.recent.seloff + 1)*16);
+  render_bar(frame, HI_COLOR, 0, (smenu.recent.selector - smenu.recent.seloff + 1)*16, SCREEN_WIDTH, 16);
 
   // Render the list from memory.
   for (unsigned i = 0; i < RECENT_ROWS; i++) {
@@ -979,7 +970,7 @@ void render_flashbrowser(volatile uint8_t *frame) {
   if (!smenu.fbrowser.maxentries)
     draw_central_text(msgs[lang_id][MSG_NOR_EMPTY], frame, SCREEN_WIDTH/2, SCREEN_HEIGHT/2-8);
   else {
-    render_bar_fs(frame, (smenu.fbrowser.selector - smenu.fbrowser.seloff + 1)*16);
+    render_bar(frame, HI_COLOR, 0, (smenu.fbrowser.selector - smenu.fbrowser.seloff + 1)*16, SCREEN_WIDTH, 16);
     for (unsigned i = 0; i < NORGAMES_ROWS; i++) {
       if (smenu.fbrowser.seloff + i >= smenu.fbrowser.maxentries)
         break;
@@ -1015,7 +1006,7 @@ void render_browser(volatile uint8_t *frame) {
   if (!smenu.browser.dispentries)
     draw_central_text(msgs[lang_id][MSG_BROW_EMPTY], frame, SCREEN_WIDTH/2, SCREEN_HEIGHT/2-8);
   else {
-    render_bar_fs(frame, (smenu.browser.selector - smenu.browser.seloff + 1)*16);
+    render_bar(frame, HI_COLOR, 0, (smenu.browser.selector - smenu.browser.seloff + 1)*16, SCREEN_WIDTH, 16);
     for (unsigned i = 0; i < BROWSER_ROWS; i++) {
       if (smenu.browser.seloff + i >= smenu.browser.dispentries)
         break;
@@ -1152,9 +1143,12 @@ static const char *render_gbarom_patching(volatile uint8_t *frame, const t_load_
 
 static const char *render_gbarom_loading(volatile uint8_t *frame, const t_load_gba_lcfg *data, bool rtc_patching, int selector) {
   char tmp[64];
+  render_bar(frame, HI_COLOR, 8, 44 + selector * 18, SCREEN_WIDTH - 16, 16);
   draw_central_text(msgs[lang_id][MSG_GBALOAD_OPTS], frame, SCREEN_WIDTH/2, 23);
+
   draw_text_ovf(msgs[lang_id][MSG_LOADER_LOADP], frame, 12, 44, 224);
   draw_central_text(msgs[lang_id][MSG_LOADER_LOADP0 + data->sram_load_type], frame, 170, 44);
+  
   draw_text_ovf(msgs[lang_id][MSG_LOADER_SAVEP], frame, 12, 62, 224);
   draw_central_text(msgs[lang_id][MSG_LOADER_SAVEP0 + data->sram_save_type], frame, 170, 62);
   draw_text_ovf(msgs[lang_id][MSG_DEF_RTCVAL], frame, 12, 80, 224);
@@ -1189,6 +1183,10 @@ void render_gba_load_popup(volatile uint8_t *frame) {
   const t_load_gba_info *info = &spop.p.load.i;
   const t_patch *p = get_game_patch(info);
   const char *ht = NULL;
+  if (spop.submenu != GbaLoadPopInfo) {
+    const unsigned offy = 44;
+    render_bar(frame, HI_COLOR, 8, offy + spop.selector * 18, SCREEN_WIDTH - 16, 16);
+  }
   switch (spop.submenu) {
   case GbaLoadPopInfo:
     render_gbarom_info(frame, info->romfn, is_superfw(&info->romh), info->gcode,
@@ -1210,12 +1208,6 @@ void render_gba_load_popup(volatile uint8_t *frame) {
       draw_text_ovf_rotate(ht, frame, 10, 137, SCREEN_WIDTH - 20, &spop.anim);
     else
       draw_central_text_ovf(ht, frame, SCREEN_WIDTH/2, 137, SCREEN_WIDTH - 20);
-  }
-
-  if (spop.submenu != GbaLoadPopInfo) {
-    const unsigned offy = 43;
-    render_bar(8, 232, offy + 0 + spop.selector * 18);
-    render_bar(8, 232, offy + 2 + spop.selector * 18);
   }
 }
 
@@ -1250,6 +1242,9 @@ void render_gba_norwrite(volatile uint8_t *frame) {
 
   draw_text_ovf("⯇", frame, 10, 23, 64);
   draw_rightj_text("⯈", frame, SCREEN_WIDTH - 10, 23);
+  
+  const unsigned offy = 44;
+  render_bar(frame, HI_COLOR, 8, SCREEN_WIDTH - 16, offy + spop.selector * 18, 16);
 
   if (spop.submenu == GbaLoadPopInfo) {
     const t_load_gba_info *info = &spop.p.norwr.i;
@@ -1266,9 +1261,7 @@ void render_gba_norwrite(volatile uint8_t *frame) {
       else
         draw_central_text_ovf(ht, frame, SCREEN_WIDTH/2, 137, SCREEN_WIDTH - 20);
     }
-    const unsigned offy = 43;
-    render_bar(8, 232, offy + 0 + spop.selector * 18);
-    render_bar(8, 232, offy + 2 + spop.selector * 18);
+
   }
 }
 
@@ -1289,6 +1282,7 @@ void render_gba_norload(volatile uint8_t *frame) {
   } else {
     bool rtc_patching = e->gattrs & GATTR_RTC;
     const char *ht = render_gbarom_loading(frame, &spop.p.norld.l, rtc_patching, spop.selector);
+    const unsigned offy = 44;
     if (ht) {
       unsigned twidth = font_width(ht);
       if (twidth > SCREEN_WIDTH - 20)
@@ -1296,9 +1290,7 @@ void render_gba_norload(volatile uint8_t *frame) {
       else
         draw_central_text_ovf(ht, frame, SCREEN_WIDTH/2, 137, SCREEN_WIDTH - 20);
     }
-    const unsigned offy = 43;
-    render_bar(8, 232, offy + 0 + spop.selector * 18);
-    render_bar(8, 232, offy + 2 + spop.selector * 18);
+
   }
 }
 #endif
@@ -1351,12 +1343,12 @@ void render_rtcpop(volatile uint8_t *frame) {
 
 
 void render_settings(volatile uint8_t *frame) {
-  renderMenu(frame, &globalSetMenu);
+  render_menu(frame, &smenu.anim_state, &globalSetMenu);
 }
 
 
 void render_ui_settings(volatile uint8_t *frame) {
-  renderMenu(frame, &uiSetMenu);
+  render_menu(frame, &smenu.anim_state, &uiSetMenu);
 }
 
 void render_info(volatile uint8_t *frame) {
@@ -1417,12 +1409,7 @@ void render_info(volatile uint8_t *frame) {
 }
 
 void render_tools(volatile uint8_t *frame) {
-  render_bar_fs(frame, 26 + smenu.tools.selector * 22);
-  for (unsigned i = 0; i < ToolsMAX; i++)
-    draw_text_ovf(msgs[lang_id][MSG_TOOLS0_SDRAM + i], frame, 22, 26 + 22 * i, 144);
-
-  smenu.anim_state = (smenu.anim_state + 1) & 255;
-  draw_central_text("▸", frame, 11 + (smenu.anim_state >> 6), 26 + 22 * smenu.tools.selector);
+  render_menu(frame, &smenu.anim_state, &toolsMenu);
 }
 
 void reload_theme(unsigned thnum) {
@@ -1989,84 +1976,14 @@ static void keypress_popup_norwrite(unsigned newkeys, uint16_t keypresses) {
 }
 
 static void keypress_popup_norload(unsigned newkeys, uint16_t keypresses) {
-  if (newkeys & KEY_BUTTUP)
-    spop.selector = MAX(0, spop.selector - keypresses);
-  if (newkeys & KEY_BUTTDOWN)
-    spop.selector = MIN(GBALdSetCNT - 1, spop.selector + keypresses);
-
   const t_flash_game_entry *e = spop.p.norld.e;
   bool uses_dsave = e->gattrs & GATTR_SAVEDS;
   bool uses_igm   = e->gattrs & GATTR_IGM;
   bool uses_rtc   = e->gattrs & GATTR_RTC;
-
-  if (newkeys & KEY_BUTTLEFT) {
-    if (spop.submenu == GbaNorLoad) {
-      if (spop.selector == GBALdSetCheats)
-        spop.p.norld.l.use_cheats = !spop.p.norld.l.use_cheats;
-      if (uses_dsave) {
-        if (spop.selector == GBALdSetLoadP)
-          spop.p.norld.l.sram_load_type = (spop.p.norld.l.sram_load_type + SaveLoadDSCNT - 1) % SaveLoadDSCNT;
-      } else {
-        if (spop.selector == GBALdSetLoadP)
-          spop.p.norld.l.sram_load_type = (spop.p.norld.l.sram_load_type + SaveLoadCNT - 1) % SaveLoadCNT;
-        else if (spop.selector == GBALdSetSaveP)
-          spop.p.norld.l.sram_save_type = (spop.p.norld.l.sram_save_type + SaveCNT - 1) % SaveCNT;
-      }
-    }
-
-    // DirSav forces automatic saving
-    if (uses_dsave)
-      spop.p.norld.l.sram_save_type = SaveDirect;
-    else if (spop.p.norld.l.sram_save_type == SaveDirect)
-      spop.p.norld.l.sram_save_type = autosave_default ? SaveReboot : SaveDisable;
-
-    // If DS is selected, do not allow manual mode.
-    if (spop.p.norld.l.sram_load_type == SaveLoadDisable && uses_dsave)
-      spop.p.norld.l.sram_load_type = SaveLoadSav;
-    // If no .sav is available, do not allow that option!
-    if (spop.p.norld.l.sram_load_type == SaveLoadSav && !spop.p.norld.l.savefile_found)
-      spop.p.norld.l.sram_load_type = uses_dsave ? SaveLoadReset : SaveLoadDisable;
-  }
-  if (newkeys & KEY_BUTTRIGHT) {
-    if (spop.submenu == GbaNorLoad) {
-      if (spop.selector == GBALdSetCheats)
-        spop.p.norld.l.use_cheats = !spop.p.norld.l.use_cheats;
-      if (uses_dsave) {
-        if (spop.selector == GBALdSetLoadP)
-          spop.p.norld.l.sram_load_type = (spop.p.norld.l.sram_load_type + 1) % SaveLoadDSCNT;
-      } else {
-        if (spop.selector == GBALdSetLoadP)
-          spop.p.norld.l.sram_load_type = (spop.p.norld.l.sram_load_type + 1) % SaveLoadCNT;
-        else if (spop.selector == GBALdSetSaveP)
-          spop.p.norld.l.sram_save_type = (spop.p.norld.l.sram_save_type + 1) % SaveCNT;
-      }
-    }
-
-    // DirSav forces automatic saving
-    if (uses_dsave)
-      spop.p.norld.l.sram_save_type = SaveDirect;
-    else if (spop.p.norld.l.sram_save_type == SaveDirect)
-      spop.p.norld.l.sram_save_type = autosave_default ? SaveReboot : SaveDisable;
-
-    // If DS is selected, do not allow manual mode.
-    if (spop.p.norld.l.sram_load_type == SaveLoadDisable && uses_dsave)
-      spop.p.norld.l.sram_load_type = SaveLoadSav;
-    // If no .sav is available, do not allow that option!
-    if (spop.p.norld.l.sram_load_type == SaveLoadSav && !spop.p.norld.l.savefile_found)
-      spop.p.norld.l.sram_load_type = SaveLoadReset;
-  }
-
-  // Disable cheat loading if no cheats are avail, or IGM is disabled
-  if (!spop.p.norld.l.cheats_found || !uses_igm)
-    spop.p.norld.l.use_cheats = false;
-
-  if (newkeys & KEY_BUTTA) {
-    if (spop.submenu == GbaLoadPopInfo) {
+  if (spop.submenu == GbaLoadPopInfo) {
+      if (newkeys & KEY_BUTTA) {
       const int stype = GET_GATTR_SAVEM(e->gattrs);
       const EnumSavetype st = stype < 0 ? SaveTypeNone : stype;
-      bool uses_dsave = e->gattrs & GATTR_SAVEDS;
-      bool uses_igm   = e->gattrs & GATTR_IGM;
-      bool uses_rtc   = e->gattrs & GATTR_RTC;
 
       t_dirsave_info dsinfo;
       unsigned errsave = prepare_savegame(
@@ -2098,31 +2015,106 @@ static void keypress_popup_norload(unsigned newkeys, uint16_t keypresses) {
         uses_igm,
         spop.p.norld.l.use_cheats ? spop.p.norld.l.cheats_size : 0);
     }
-    else if (spop.selector == GBALdRemember) {
-      // Save settings to disk now!
-      t_rom_load_settings ld_sett = {  // Use defaults in case it doesn't really exist
-        .patch_policy = patcher_default,
-        .use_igm = ingamemenu_default,
-        .use_rtc = rtcpatch_default,
-        .use_dsaving = autosave_prefer_ds
-      };
-      t_rom_launch_settings lh_sett = {
-        .use_cheats = spop.p.norld.l.use_cheats,
-        .rtcts = spop.p.norld.l.rtcval
-      };
-
-      // We load the loading settings to ensure we do not overwrite them.
-      load_rom_settings(e->game_name, &ld_sett, NULL);
-      save_rom_settings(e->game_name, &ld_sett, &lh_sett);
-      spop.alert_msg = msgs[lang_id][MSG_REMEMB_CFG_OK];
+  }
+  else {
+    if (newkeys & KEY_BUTTUP){
+      spop.selector = MAX(0, spop.selector - keypresses);
+      smenu.anim_state = 0;
     }
-    else if (spop.selector == GBALdSetRTC) {
-      void accept_rtc() {
-        spop.p.norld.l.rtcval = date2timestamp(&spop.rtcpop.val);
+    if (newkeys & KEY_BUTTDOWN){
+      spop.selector = MIN(GBALdSetCNT - 1, spop.selector + keypresses);
+      smenu.anim_state = 0;
+    }
+    if (newkeys & KEY_BUTTLEFT) {
+      smenu.anim_state = 0;
+      if (spop.submenu == GbaNorLoad) {
+        if (spop.selector == GBALdSetCheats)
+          spop.p.norld.l.use_cheats = !spop.p.norld.l.use_cheats;
+        if (uses_dsave) {
+          if (spop.selector == GBALdSetLoadP)
+            spop.p.norld.l.sram_load_type = (spop.p.norld.l.sram_load_type + SaveLoadDSCNT - 1) % SaveLoadDSCNT;
+        } else {
+          if (spop.selector == GBALdSetLoadP)
+            spop.p.norld.l.sram_load_type = (spop.p.norld.l.sram_load_type + SaveLoadCNT - 1) % SaveLoadCNT;
+          else if (spop.selector == GBALdSetSaveP)
+            spop.p.norld.l.sram_save_type = (spop.p.norld.l.sram_save_type + SaveCNT - 1) % SaveCNT;
+        }
       }
-      if (uses_rtc) {
-        timestamp2date(spop.p.norld.l.rtcval, &spop.rtcpop.val);
-        spop.rtcpop.callback = accept_rtc;
+
+      // DirSav forces automatic saving
+      if (uses_dsave)
+        spop.p.norld.l.sram_save_type = SaveDirect;
+      else if (spop.p.norld.l.sram_save_type == SaveDirect)
+        spop.p.norld.l.sram_save_type = autosave_default ? SaveReboot : SaveDisable;
+
+      // If DS is selected, do not allow manual mode.
+      if (spop.p.norld.l.sram_load_type == SaveLoadDisable && uses_dsave)
+        spop.p.norld.l.sram_load_type = SaveLoadSav;
+      // If no .sav is available, do not allow that option!
+      if (spop.p.norld.l.sram_load_type == SaveLoadSav && !spop.p.norld.l.savefile_found)
+        spop.p.norld.l.sram_load_type = uses_dsave ? SaveLoadReset : SaveLoadDisable;
+    }
+    if (newkeys & KEY_BUTTRIGHT) {
+      smenu.anim_state = 0;
+      if (spop.submenu == GbaNorLoad) {
+        if (spop.selector == GBALdSetCheats)
+          spop.p.norld.l.use_cheats = !spop.p.norld.l.use_cheats;
+        if (uses_dsave) {
+          if (spop.selector == GBALdSetLoadP)
+            spop.p.norld.l.sram_load_type = (spop.p.norld.l.sram_load_type + 1) % SaveLoadDSCNT;
+        } else {
+          if (spop.selector == GBALdSetLoadP)
+            spop.p.norld.l.sram_load_type = (spop.p.norld.l.sram_load_type + 1) % SaveLoadCNT;
+          else if (spop.selector == GBALdSetSaveP)
+            spop.p.norld.l.sram_save_type = (spop.p.norld.l.sram_save_type + 1) % SaveCNT;
+        }
+      }
+
+      // DirSav forces automatic saving
+      if (uses_dsave)
+        spop.p.norld.l.sram_save_type = SaveDirect;
+      else if (spop.p.norld.l.sram_save_type == SaveDirect)
+        spop.p.norld.l.sram_save_type = autosave_default ? SaveReboot : SaveDisable;
+
+      // If DS is selected, do not allow manual mode.
+      if (spop.p.norld.l.sram_load_type == SaveLoadDisable && uses_dsave)
+        spop.p.norld.l.sram_load_type = SaveLoadSav;
+      // If no .sav is available, do not allow that option!
+      if (spop.p.norld.l.sram_load_type == SaveLoadSav && !spop.p.norld.l.savefile_found)
+        spop.p.norld.l.sram_load_type = SaveLoadReset;
+    }
+
+    // Disable cheat loading if no cheats are avail, or IGM is disabled
+    if (!spop.p.norld.l.cheats_found || !uses_igm)
+      spop.p.norld.l.use_cheats = false;
+
+    if (newkeys & KEY_BUTTA) {
+      if (spop.selector == GBALdRemember) {
+        // Save settings to disk now!
+        t_rom_load_settings ld_sett = {  // Use defaults in case it doesn't really exist
+          .patch_policy = patcher_default,
+          .use_igm = ingamemenu_default,
+          .use_rtc = rtcpatch_default,
+          .use_dsaving = autosave_prefer_ds
+        };
+        t_rom_launch_settings lh_sett = {
+          .use_cheats = spop.p.norld.l.use_cheats,
+          .rtcts = spop.p.norld.l.rtcval
+        };
+
+        // We load the loading settings to ensure we do not overwrite them.
+        load_rom_settings(e->game_name, &ld_sett, NULL);
+        save_rom_settings(e->game_name, &ld_sett, &lh_sett);
+        spop.alert_msg = msgs[lang_id][MSG_REMEMB_CFG_OK];
+      }
+      else if (spop.selector == GBALdSetRTC) {
+        void accept_rtc() {
+          spop.p.norld.l.rtcval = date2timestamp(&spop.rtcpop.val);
+        }
+        if (uses_rtc) {
+          timestamp2date(spop.p.norld.l.rtcval, &spop.rtcpop.val);
+          spop.rtcpop.callback = accept_rtc;
+        }
       }
     }
   }
@@ -2377,7 +2369,9 @@ static void keypress_menu_norbrowse(unsigned newkeys, uint16_t keypresses) {
   }
 }
 #endif
-
+static void accept_rtc() {
+  rtcvalue_default = date2timestamp(&spop.rtcpop.val);
+}
 static void keypress_menu_settings(unsigned newkeys, uint16_t keypresses) {
   if (newkeys & KEY_BUTTUP){
     // Max 1 to skip the top option in the settings
@@ -2455,14 +2449,12 @@ static void keypress_menu_settings(unsigned newkeys, uint16_t keypresses) {
   }
 
   if (newkeys & KEY_BUTTA && smenu.set.selector == DefsRTCVal) {
-    void accept_rtc() {
-      rtcvalue_default = date2timestamp(&spop.rtcpop.val);
-    }
+
     timestamp2date(rtcvalue_default, &spop.rtcpop.val);
     spop.rtcpop.callback = accept_rtc;
   }
   if (newkeys & KEY_BUTTA && smenu.set.selector == SettSave) {
-    smenu.set.selector = 0;
+    smenu.set.selector = 1;
     if (save_settings())
       spop.alert_msg = msgs[lang_id][MSG_OK_SETSAVE];
     else
@@ -2513,14 +2505,26 @@ static void keypress_menu_uisettings(unsigned newkeys, uint16_t keypresses) {
   reload_theme(menu_theme);
 }
 
+static void flash_clear_callback(bool confirm) {
+  if (confirm) {
+    // Delete all metadata (data is not really wiped, takes too long)
+    if (flashmgr_wipe(ROM_FLASHMETA_ADDR, FLASH_METADATA_SIZE))
+      spop.alert_msg = msgs[lang_id][MSG_NOR_CLOK];
+    else
+      spop.alert_msg = msgs[lang_id][MSG_ERR_NORUPD];
+
+    flashbrowser_reload();     // Ensure we clear the NOR entries from RAM.
+  }
+}
+
 static void keypress_menu_tools(unsigned newkeys, uint16_t keypresses) {
   if (newkeys & KEY_BUTTUP)
     smenu.tools.selector = MAX(0, smenu.tools.selector - keypresses);
   if (newkeys & KEY_BUTTDOWN)
-    smenu.tools.selector = MIN(ToolsMAX - 1, smenu.tools.selector + keypresses);
+    smenu.tools.selector = MIN(ToolMAX - 1, smenu.tools.selector + keypresses);
 
   if (newkeys & KEY_BUTTA) {
-    if (smenu.tools.selector == ToolsSDRAMTest) {
+    if (smenu.tools.selector == ToolSDRAMTest) {
       // Performs a test on the SRAM/SDRAM, ensure they are fine.
       set_supercard_mode(MAPPED_SDRAM, true, false);
 
@@ -2531,13 +2535,13 @@ static void keypress_menu_tools(unsigned newkeys, uint16_t keypresses) {
 
       set_supercard_mode(MAPPED_SDRAM, true, true);
     }
-    if (smenu.tools.selector == ToolsSRAMTest) {
+    if (smenu.tools.selector == ToolSRAMTest) {
       if (sram_test())
         spop.alert_msg = msgs[lang_id][MSG_BAD_SRAM];
       else
         spop.alert_msg = msgs[lang_id][MSG_GOOD_RAM];
     }
-    else if (smenu.tools.selector == ToolsBatteryTest) {
+    else if (smenu.tools.selector == ToolBatteryTest) {
       // Go ahead and fill in SRAM with a pattern.
       spop.qpop.message = msgs[lang_id][MSG_Q2_SRAMTST];
       spop.qpop.default_button = msgs[lang_id][MSG_Q_NO];
@@ -2546,7 +2550,7 @@ static void keypress_menu_tools(unsigned newkeys, uint16_t keypresses) {
       spop.qpop.callback = sram_battery_test_callback;
       spop.qpop.clear_popup_ok = true;
     }
-    else if (smenu.tools.selector == ToolsSDBench) {
+    else if (smenu.tools.selector == ToolSDBench) {
       slowsd = use_slowld;
       int ret = sdbench_read(loadrom_progress_abort);
       slowsd = true;
@@ -2558,7 +2562,7 @@ static void keypress_menu_tools(unsigned newkeys, uint16_t keypresses) {
         spop.alert_msg = smenu.info.tstr;
       }
     }
-    else if (smenu.tools.selector == ToolsFlashBak) {
+    else if (smenu.tools.selector == ToolFlashBak) {
       // Backup the flash contents to a file.
       if (dump_flashmem_backup())
         spop.alert_msg = msgs[lang_id][MSG_FLASH_READOK];
@@ -2568,18 +2572,8 @@ static void keypress_menu_tools(unsigned newkeys, uint16_t keypresses) {
       browser_reload();
     }
     #ifdef SUPPORT_NORGAMES
-    else if (smenu.tools.selector == ToolsFlashClr) {
-      void flash_clear_callback(bool confirm) {
-        if (confirm) {
-          // Delete all metadata (data is not really wiped, takes too long)
-          if (flashmgr_wipe(ROM_FLASHMETA_ADDR, FLASH_METADATA_SIZE))
-            spop.alert_msg = msgs[lang_id][MSG_NOR_CLOK];
-          else
-            spop.alert_msg = msgs[lang_id][MSG_ERR_NORUPD];
+    else if (smenu.tools.selector == ToolFlashClr) {
 
-          flashbrowser_reload();     // Ensure we clear the NOR entries from RAM.
-        }
-      }
       // Prompt the user for clearing the memory.
       spop.qpop.message = msgs[lang_id][MSG_Q6_CLRNOR];
       spop.qpop.default_button = msgs[lang_id][MSG_Q_NO];

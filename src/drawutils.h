@@ -76,25 +76,25 @@ static inline void render_icon_trans(unsigned x, unsigned y, unsigned iconn) {
 
 
 // Split into two functions since one can be unrolled
-static inline void render_bar_fs(volatile uint8_t *frame, unsigned y) {
-  // TODO: Update this with direct memset like done for the top bar instead of sprite based
-  dma_memset16(&frame[SCREEN_WIDTH * y], dup8(HI_COLOR), SCREEN_WIDTH*16/2);
-  // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
-  // #pragma GCC unroll 15
-  // for (unsigned i = 0; i < 15; i ++)
-  //   render_icon_trans(i * 16, y, 63);
-}
-
-static inline void render_bar(unsigned startx, unsigned endx, unsigned y) {
-  // TODO: Update this with direct memset like done for the top bar instead of sprite based
-  //dma_memset16(&frame[SCREEN_WIDTH * y] + startx, dup8(HI_COLOR), SCREEN_WIDTH*16/2);
-  // SCREN_WIDTH / SPRITE_SIZE = 240 / 16 = 15
-  if (startx >= endx || y > SCREEN_HEIGHT || startx >= SCREEN_WIDTH)
+inline void render_bar(volatile uint8_t *frame, uint8_t color, unsigned x, unsigned y, uint8_t width, uint8_t height) {
+  // Prevent over render scenarios
+  if (x >= SCREEN_WIDTH || y >= SCREEN_HEIGHT)
     return;
-  // Don't allow over-rendering
-  endx = MIN(endx, SCREEN_WIDTH);
-  for (unsigned i = 0; i < ((endx - startx) / 16); i ++)
-    render_icon_trans(startx + (i * 16), y, 63);
+  
+  // Clamp range to the frame buffer
+  width = MIN(width, SCREEN_WIDTH - x);
+  height = MIN(height, SCREEN_HEIGHT - y);
+
+  if (width == SCREEN_WIDTH && x == 0)
+    // If bar is full width, we can memset all pixel rows at once
+    dma_memset16(&frame[SCREEN_WIDTH * y], dup8(color), SCREEN_WIDTH * height / 2);
+  else {
+    // If bar is not full width, we have to set each pixel row independently
+    for (uint8_t offy = 0; offy < height; offy++) {
+      dma_memset16(&frame[SCREEN_WIDTH * (offy + y) + x], dup8(color), width/2);
+    }
+    
+  }
 }
 
 

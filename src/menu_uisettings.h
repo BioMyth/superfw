@@ -67,8 +67,7 @@ static const menuoption_t UiSetMenuOpts[] = {
 };
 
 const menu_t uiSetMenu = {
-      .selector = &smenu.uiset.selector,
-      .optionCount = UiSettMAX,
-      .options = UiSetMenuOpts,
-      .helpCallback = NULL
+  .selector = &smenu.uiset.selector,
+  .optionCount = UiSettMAX,
+  .options = UiSetMenuOpts
 };
