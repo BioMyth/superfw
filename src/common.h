@@ -50,6 +50,7 @@ extern const uint32_t dldi_payload_size;
 extern const uint8_t  ingame_trampoline_payload[];
 extern const uint32_t ingame_trampoline_payload_size;
 
+
 // In-game menu requires ~1MB of free space. Lives in the last MB of ROM.
 #define GBA_ROM_BASE              0x08000000
 #define GBA_ROM_BASE_WS1          0x0A000000

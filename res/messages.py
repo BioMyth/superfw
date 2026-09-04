@@ -321,7 +321,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "json":
         if not v.startswith("~"):
           allentries[k] = v
   print(json.dumps(allentries, indent=2))
-elif len(sys.argv) > 1 and sys.argv[1] == "h":
+elif len(sys.argv) > 1 and (sys.argv[1] == "h" or sys.argv[1] == "c"):
   all_entries = {
     "main": en_strings,
     "menu": en_menu_strings,
@@ -339,58 +339,72 @@ elif len(sys.argv) > 1 and sys.argv[1] == "h":
           strlist[k] = (v, c)
         tmp[k] = (v, c)
     strall[mname] = tmp
-  print("#pragma once")
-  print("#include \"common.h\"")
-  print("enum TranslationID {")
-  for k, (_, c) in sorted(strlist.items()):
-    if c:
-      print("#ifdef %s" % c)
-    print("  %s," % k)
-    if c:
-      print("#endif")
-  print("};")
-
-  print("const char * const msg_en[] = {")
-  for k, (v, c) in sorted(strlist.items()):
-    if c:
-      print("#ifdef %s" % c)
-    # Could be a reference to another menu, resolve it
-    if v.startswith("~"):
-      mn, mk = v[1:].split(".")
-      v = strall[mn][mk][0]
-    print('  /* %s */ "%s",' % (k.ljust(20), v))
-    if c:
-      print("#endif")
-  print("};")
-
-  # Attempt to load strings for all other languages
-  langdir = os.path.join(os.path.dirname(__file__), "lang")
-  for l in OTHER_LANGS:
-    d = json.load(open(os.path.join(langdir, "%s.json" % l)))
-    print("const char * const msg_%s[] = {" % l)
-    for k, (en_v, c) in sorted(strlist.items()):
+  # Add one for en
+  langCount = len(OTHER_LANGS) + 1
+  if sys.argv[1] == "h":
+    print("#pragma once")
+    print("#include \"common.h\"")
+    print("enum TranslationID {")
+    for k, (_, c) in sorted(strlist.items()):
       if c:
         print("#ifdef %s" % c)
-      if en_v.startswith("~"):
-        mn, mk = en_v[1:].split(".")
-        v = d[mk] if mk in d and d[mk] else en_v
-      else:
-        v = d[k] if k in d and d[k] else en_v
+      print("  %s," % k)
+      if c:
+        print("#endif")
+    print("};")
+    print("extern const char * const * const msgs[%s];" % langCount)
+
+    if sys.argv[2] == "main":
+      print("extern const uint16_t lang_codes[%i];" % langCount)
+
+  elif sys.argv[1] == "c":
+    headerName = ""
+    if sys.argv[2] == "main":
+      headerName = "messages_data.h"
+    elif sys.argv[2] == "menu":
+      headerName = "menu_messages.h"
+    print("#include \"%s\"" % headerName)
+    print("static const char * const msg_en[] = {")
+    for k, (v, c) in sorted(strlist.items()):
+      if c:
+        print("#ifdef %s" % c)
+      # Could be a reference to another menu, resolve it
+      if v.startswith("~"):
+        mn, mk = v[1:].split(".")
+        v = strall[mn][mk][0]
       print('  /* %s */ "%s",' % (k.ljust(20), v))
       if c:
         print("#endif")
     print("};")
 
-  print("const char * const * const msgs[] = {")
-  for l in ["en"] + OTHER_LANGS:
-    print("  msg_%s," % l)
-  print("};")
+    # Attempt to load strings for all other languages
+    langdir = os.path.join(os.path.dirname(__file__), "lang")
+    for l in OTHER_LANGS:
+      d = json.load(open(os.path.join(langdir, "%s.json" % l)))
+      print("static const char * const msg_%s[] = {" % l)
+      for k, (en_v, c) in sorted(strlist.items()):
+        if c:
+          print("#ifdef %s" % c)
+        if en_v.startswith("~"):
+          mn, mk = en_v[1:].split(".")
+          v = d[mk] if mk in d and d[mk] else en_v
+        else:
+          v = d[k] if k in d and d[k] else en_v
+        print('  /* %s */ "%s",' % (k.ljust(20), v))
+        if c:
+          print("#endif")
+      print("};")
 
-  if sys.argv[2] == "main":
-    print("const uint16_t lang_codes[] = {")
+    print("const char * const * const msgs[%s] = {" % langCount)
     for l in ["en"] + OTHER_LANGS:
-      c = ord(l[0]) | (ord(l[1]) << 8)
-      print("  0x%04x,     // %s" % (c, l))
+      print("  msg_%s," % l)
     print("};")
+
+    if sys.argv[2] == "main":
+      print("const uint16_t lang_codes[%i] = {" % langCount)
+      for l in ["en"] + OTHER_LANGS:
+        c = ord(l[0]) | (ord(l[1]) << 8)
+        print("  0x%04x,     // %s" % (c, l))
+      print("};")
 
 

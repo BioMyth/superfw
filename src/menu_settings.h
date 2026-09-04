@@ -4,8 +4,7 @@
 #include "common.h"
 #include "settings.h"
 #include "nanoprintf.h"
-#include "messages.h"
-#include "renderEngine.h"
+#include "menu_renderer.h"
 
 
 enum settingsOptions{
@@ -70,219 +69,180 @@ static void saveStatePathRenderCallback(char *tmpbuf, uint16_t buffsize){
 
 
 
-static const menuoption_t SetMenuOpts[] = {
+static const struct menu_row SetMenuOpts[] = {
   {
-    MSG_SET_TITL1,
-    Header,
-    0,
-    NULL,
-    // false,
-    NULL
+    .title_trans = MSG_SET_TITL1,
+    .type = MENU_ROW_HEADER,
   },
   {
-    MSG_SETT_HOTK,
-    Callback,
-    0,
-    NULL,
-    // false,
-    hotkeyRenderCallback
+    .title_trans = MSG_SETT_HOTK,
+    .type = MENU_ROW_CUSTOM,
+    .callback = hotkeyRenderCallback
   },
   {
-    MSG_SETT_BOOT,
-    TxtScroll,
-    MSG_BOOT_TYPE0,
-    &boot_bios_splash,
-    // false,
-    NULL
+    .title_trans = MSG_SETT_BOOT,
+    .type = MENU_ROW_TXT_SCROLL,
+    .base_value_trans = MSG_BOOT_TYPE0,
+    .value_sel = &boot_bios_splash
   },
   {
-    MSG_SETT_FASTSD,
-    InvBool,
-    0,
-    &use_slowld,
-    // false,
-    NULL
+    .title_trans = MSG_SETT_FASTSD,
+    .type = MENU_ROW_BOOL_INV,
+    .value_sel = &use_slowld
   },
   #ifdef SUPPORT_NORGAMES
   {
-    MSG_SETT_VERNOR,
-    Bool,
-    0,
-    &use_verify_nor,
-    // false,
-    NULL
+    .title_trans = MSG_SETT_VERNOR,
+    .type = MENU_ROW_BOOL,
+    .value_sel = &use_verify_nor
   },
   #endif
   {
-    MSG_SETT_FASTEW,
-    Bool,
-    0,
-    &use_fastew,
-    // false,
-    NULL
+    .title_trans = MSG_SETT_FASTEW,
+    .type = MENU_ROW_BOOL,
+    .value_sel = &use_fastew,
   },
   {
-    MSG_SETT_SAVET,
-    Callback,
-    0,
-    NULL,
-    // false,
-    savePathRenderCallback
+    .title_trans = MSG_SETT_SAVET,
+    .type = MENU_ROW_CUSTOM,
+    .callback = savePathRenderCallback
   },
   #ifdef SUPPORT_NORGAMES
   {
-    MSG_SETT_SAVETX,
-    Callback,
-    0,
-    NULL,
-    // false,
-    savePathFlashRenderCallback
+    .title_trans = MSG_SETT_SAVETX,
+    .type = MENU_ROW_CUSTOM,
+    .callback = savePathFlashRenderCallback
   },
   #endif
   {
-    MSG_SETT_SAVEBK,
-    IntScroll,
-    0,
-    &backup_sram_default,
-    // false,
-    NULL
+    .title_trans = MSG_SETT_SAVEBK,
+    .type = MENU_ROW_INT_SCROLL,
+    .value_sel = &backup_sram_default
   },
   {
-    MSG_SETT_STATET,
-    Callback,
-    0,
-    NULL,
-    // false,
-    saveStatePathRenderCallback
+    .title_trans = MSG_SETT_STATET,
+    .type = MENU_ROW_CUSTOM,
+    .callback = saveStatePathRenderCallback
   },
   {
-    MSG_SETT_CHTEN,
-    Bool,
-    0,
-    &enable_cheats,
-    // false,
-    NULL
+    .title_trans = MSG_SETT_CHTEN,
+    .type = MENU_ROW_BOOL,
+    .value_sel = &enable_cheats
   },
   {
-    MSG_SET_TITL2,
-    Header,
-    0,
-    NULL,
-    // false,
-    NULL
+    .title_trans = MSG_SET_TITL2,
+    .type = MENU_ROW_HEADER
   },
   {
-    MSG_DEFS_PATCH,
-    TxtScroll,
-    MSG_PATCH_TYPE0,
-    &patcher_default,
-    // false,
-    NULL
+    .title_trans = MSG_DEFS_PATCH,
+    .type = MENU_ROW_TXT_SCROLL,
+    .base_value_trans = MSG_PATCH_TYPE0,
+    .value_sel = &patcher_default
   },
   {
-    MSG_LOADER_MENU,
-    Bool,
-    0,
-    &ingamemenu_default,
-    // false,
-    NULL
+    .title_trans = MSG_LOADER_MENU,
+    .type = MENU_ROW_BOOL,
+    .value_sel = &ingamemenu_default
   },
   {
-    MSG_LOADER_RTCE,
-    Bool,
-    0,
-    &rtcpatch_default,
-    // false,
-    NULL
+    .title_trans = MSG_LOADER_RTCE,
+    .type = MENU_ROW_BOOL,
+    .value_sel = &rtcpatch_default
   },
   {
-    MSG_DEF_RTCVAL,
-    Callback,
-    0,
-    NULL,
-    // false,
-    rtcRenderCallback
+    .title_trans = MSG_DEF_RTCVAL,
+    .type = MENU_ROW_CUSTOM,
+    .callback = rtcRenderCallback
   },
   {
-    MSG_DEF_SPEED,
-    Callback,
-    0,
-    NULL,
-    // false,
-    rtcSpeedRenderCallback
+    .title_trans = MSG_DEF_SPEED,
+    .type = MENU_ROW_CUSTOM,
+    .callback = rtcSpeedRenderCallback
   },
   {
-    MSG_LOADER_LOADP,
-    InvBool,
-    MSG_DEF_LOADP0,
-    &autoload_default,
-    // false,
-    NULL
+    .title_trans = MSG_LOADER_LOADP,
+    .type = MENU_ROW_BOOL_INV,
+    .base_value_trans = MSG_DEF_LOADP0,
+    .value_sel = &autoload_default
   },
   {
-    MSG_LOADER_SAVEP,
-    Bool,
-    MSG_DEF_SAVEP0,
-    &autosave_default,
-    // false,
-    NULL
+    .title_trans = MSG_LOADER_SAVEP,
+    .type = MENU_ROW_BOOL,
+    .base_value_trans = MSG_DEF_SAVEP0,
+    .value_sel = &autosave_default
   },
   {
-    MSG_LOADER_PREFDS,
-    Bool,
-    0,
-    &autosave_prefer_ds,
-    // false,
-    NULL
+    .title_trans = MSG_LOADER_PREFDS,
+    .type = MENU_ROW_BOOL,
+    .value_sel = &autosave_prefer_ds
   },
   {
-    MSG_UIS_SAVE,
-    Button,
-    0,
-    NULL,
-    // false,
-    NULL
+    .title_trans = MSG_UIS_SAVE,
+    .type = MENU_ROW_BUTT
   }
 };
 
 
-
-void uiSetHelpCallback(char *tmpbuf, uint8_t selector) {
-  if (smenu.set.selector == SettSaveLoc) {
+void uiSetHelpCallback(char *tmp, uint8_t row_sel) {
+  if (row_sel == SettSaveLoc) {
     if (save_path_default == SaveRomName)
-      strcpy(tmpbuf, msgs[lang_id][MSG_SAVE_TYPE_NR]);
-    else {
-      npf_snprintf(tmpbuf, TMP_BUF_SIZE, msgs[lang_id][MSG_SAVE_TYPE_PT], save_paths[save_path_default]);
-    }
+      strcpy(tmp, msgs[lang_id][MSG_SAVE_TYPE_NR]);
+    else
+      npf_snprintf(tmp, TMP_BUF_SIZE, msgs[lang_id][MSG_SAVE_TYPE_PT], save_paths[save_path_default]);
   }
-  else if (smenu.set.selector == SettStateLoc) {
-    npf_snprintf(tmpbuf, TMP_BUF_SIZE, msgs[lang_id][MSG_STATE_TYPE_PT], savestates_paths[state_path_default]);
+  else if (row_sel == SettStateLoc) {
+    npf_snprintf(tmp, TMP_BUF_SIZE, msgs[lang_id][MSG_STATE_TYPE_PT], savestates_paths[state_path_default]);
   }
   #ifdef SUPPORT_NORGAMES
-  else if (smenu.set.selector == SettSaveLocNOR) {
-    npf_snprintf(tmpbuf, TMP_BUF_SIZE, msgs[lang_id][MSG_SAVE_TYPE_PTX], save_paths[save_path_nor_default]);
+  else if (row_sel == SettSaveLocNOR) {
+    npf_snprintf(tmp, TMP_BUF_SIZE, msgs[lang_id][MSG_SAVE_TYPE_PTX], save_paths[save_path_nor_default]);
   }
   #endif
   else {
-    unsigned help_msg = selector == SettBootType ? MSG_BOOT_TYPE_I0 + boot_bios_splash :
-                        selector == SettSaveBkp  ? MSG_BACKUP_I :
-                        selector == SettFastSD   ? MSG_FASTSD_I :
-                        selector == SettFastEWRAM? MSG_FASTEW_I :
-                        selector == DefsPatchEng ? MSG_PATCH_TYPE_I0 + patcher_default :
-                        selector == DefsLoadPol  ? MSG_DEF_LOADP_I0 + (autoload_default ^ 1) :
-                        selector == DefsSavePol  ? MSG_DEF_SAVEP_I0 + (autosave_default ^ 1) :
-                        selector == DefsPrefDS   ? MSG_LOADER_PREFDSI :
-                        #ifdef SUPPORT_NORGAMES
-                        selector == SettVerifyNOR ? MSG_VERNOR_I :
-                        #endif
-                        MSG_EMPTY;
-    strcpy(tmpbuf, msgs[lang_id][help_msg]);
+    unsigned help_trans;
+      if( row_sel == SettBootType){
+       help_trans = MSG_BOOT_TYPE_I0 + boot_bios_splash;
+      } else {
+        switch (row_sel)
+        {
+        case SettSaveBkp:
+          help_trans = MSG_BACKUP_I;
+          break;
+        case SettFastSD:
+          help_trans = MSG_FASTSD_I;
+          break;
+        case SettFastEWRAM:
+          help_trans = MSG_FASTEW_I;
+          break;
+        case DefsPrefDS:
+          help_trans = MSG_LOADER_PREFDSI;
+          break;
+        #ifdef SUPPORT_NORGAMES
+        case SettVerifyNOR:
+          help_trans = MSG_VERNOR_I;
+          break;
+        #endif
+        case DefsPatchEng:
+          help_trans = MSG_PATCH_TYPE_I0 + patcher_default;
+          break;
+        case DefsLoadPol:
+          help_trans = MSG_DEF_LOADP_I0 + (autoload_default ^ 1);
+          break;
+        case DefsSavePol:
+          help_trans = MSG_DEF_SAVEP_I0 + (autosave_default ^ 1);
+          break;
+        default:
+          help_trans = MSG_EMPTY;
+          break;
+        }
+      }
+    strcpy(tmp, msgs[lang_id][help_trans]);
   }
 }
 
-const menu_t globalSetMenu = {
-  .selector = &smenu.set.selector,
-  .optionCount = SettMAX,
-  .options = SetMenuOpts,
-  .bottCallback = uiSetHelpCallback
+const struct menu globalSetMenu = {
+  .menu_sel = &smenu.set.selector,
+  .row_cnt = SettMAX,
+  .rows = SetMenuOpts,
+  .bott_callback = uiSetHelpCallback
 };

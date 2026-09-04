@@ -128,6 +128,7 @@ MENUFILES=src/ingame.S \
           src/nanoprintf.c \
           src/supercard_io.S \
           src/supercard_driver.c \
+          src/menu_messages.c \
           ${FATFSFILES}
 
 INFILES=src/gba_ewram_crt0.S \
@@ -163,6 +164,9 @@ INFILES=src/gba_ewram_crt0.S \
         src/heapsort.c \
         src/nanoprintf.c \
         src/fonts/font_render.c \
+        src/res/icons.c \
+        src/drawutils.c \
+        src/menu_renderer.c \
         ${FATFSFILES}
 
 all:	$(FWBINFILES) $(BIEMUFILES) directsave.payload ingame_trampoline.payload
@@ -188,7 +192,7 @@ directsave.payload:	$(DIRECTSAVEFILES)
 			-nostartfiles -fno-builtin -Wl,-Map=directsave.map -Wl,--print-memory-usage
 	$(OBJCOPY) --output-target=binary directsave.elf directsave.payload
 
-ingamemenu.payload:	$(MENUFILES) src/menu_messages.h
+ingamemenu.payload:	src/menu_messages.h $(MENUFILES)
 	# Build in-game menu
 	$(CC) $(INGAME_CFLAGS) -o ingamemenu.elf $(MENUFILES) -T ldscripts/gba_ingame.ld \
 			-nostartfiles -fno-builtin -Wl,-Map=firmware.ingame.map -Wl,--print-memory-usage
@@ -199,10 +203,12 @@ ingame_trampoline.payload:	src/ingame_trampoline.S
 	$(OBJCOPY) --output-target=binary ingame_trampoline.elf ingame_trampoline.payload
 
 src/messages_data.h:	res/messages.py
-	./res/messages.py h main > src/messages_data.h
+	./res/messages.py h main > src/messages_data.h && ./res/messages.py c main > src/messages_data.c
+
 
 src/menu_messages.h:	res/messages.py
-	./res/messages.py h menu > src/menu_messages.h
+	./res/messages.py h menu > src/menu_messages.h && ./res/messages.py c menu > src/menu_messages.c
+
 
 firmware.ewram.gba.comp:	firmware.ewram.gba ./upkr.elf
 	./upkr.elf -l $(COMPRESSION_RATIO) $< $@
@@ -227,5 +233,5 @@ upkr.elf:	tools/upkr.cc
 
 clean:
 	rm -f ldscripts/*.i superfw-*.fw *.gba *.elf *.payload *.map res/*.comp \
-  rm -f src/menu_messages.h src/messages_data.h
+  rm -f src/menu_messages.h src/menu_messages.c src/messages_data.h src/messages_data.c
   # rm -f *.comp emu/*.comp # Get really annoyed at how long it takes

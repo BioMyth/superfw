@@ -1,7 +1,6 @@
 #pragma once
 
-#include "messages.h"
-#include "renderEngine.h"
+#include "menu_renderer.h"
 #include "settings.h"
 #include "menustate.h"
 
@@ -15,59 +14,41 @@ typedef enum UiSetEnum{
   UiSettMAX,
 } UiSetEnum;
 
-static const menuoption_t UiSetMenuOpts[] = {
+static const struct menu_row UiSetMenuOpts[] = {
   {
-    MSG_UIS_THEME,
-    IntScroll,
-    0,
-    &menu_theme,
-    // false,
-    NULL
+    .title_trans = MSG_UIS_THEME,
+    .type = MENU_ROW_INT_SCROLL,
+    .value_sel = &menu_theme
   },
   {
-    MSG_UIS_LANG,
-    TxtScroll,
-    MSG_LANG_NAME,
-    NULL,
-    // false,
-    NULL
+    .title_trans = MSG_UIS_LANG,
+    .type = MENU_ROW_TXT_SCROLL,
+    .base_value_trans = MSG_LANG_NAME
   },
   {
-    MSG_UIS_RECNT,
-    Bool,
-    0,
-    &recent_menu,
-    // false,
-    NULL
+    .title_trans = MSG_UIS_RECNT,
+    .type = MENU_ROW_BOOL,
+    .value_sel = &recent_menu
   },
   {
-    MSG_UIS_ANSPD,
-    TxtScroll,
-    MSG_UIS_SPD0,
-    &anim_speed,
-    // false,
-    NULL
+    .title_trans = MSG_UIS_ANSPD,
+    .type = MENU_ROW_TXT_SCROLL,
+    .base_value_trans = MSG_UIS_SPD0,
+    .value_sel = &anim_speed
   },
   {
-    MSG_UIS_BHID,
-    InvBool,
-    0,
-    &hide_hidden,
-    // false,
-    NULL
+    .title_trans = MSG_UIS_BHID,
+    .type = MENU_ROW_BOOL_INV,
+    .value_sel = &hide_hidden
   },
   {
-    MSG_UIS_SAVE,
-    Button,
-    0,
-    NULL,
-    // false,
-    NULL
+    .title_trans = MSG_UIS_SAVE,
+    .type = MENU_ROW_BUTT
   }
 };
 
-const menu_t uiSetMenu = {
-  .selector = &smenu.uiset.selector,
-  .optionCount = UiSettMAX,
-  .options = UiSetMenuOpts
+const struct menu uiSetMenu = {
+  .menu_sel = &smenu.uiset.selector,
+  .row_cnt = UiSettMAX,
+  .rows = UiSetMenuOpts
 };
