@@ -344,6 +344,7 @@ elif len(sys.argv) > 1 and (sys.argv[1] == "h" or sys.argv[1] == "c"):
   if sys.argv[1] == "h":
     print("#pragma once")
     print("#include \"common.h\"")
+    print("#define LANG_COUNT ", langCount)
     print("enum TranslationID {")
     for k, (_, c) in sorted(strlist.items()):
       if c:

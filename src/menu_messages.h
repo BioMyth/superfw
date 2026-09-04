@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#define LANG_COUNT  14
 enum TranslationID {
   IMENU_CANCEL,
   IMENU_FRZRTC,

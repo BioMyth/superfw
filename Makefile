@@ -167,6 +167,8 @@ INFILES=src/gba_ewram_crt0.S \
         src/res/icons.c \
         src/drawutils.c \
         src/menu_renderer.c \
+        src/messages_data.c \
+        src/messages.c \
         ${FATFSFILES}
 
 all:	$(FWBINFILES) $(BIEMUFILES) directsave.payload ingame_trampoline.payload
@@ -176,7 +178,7 @@ all:	$(FWBINFILES) $(BIEMUFILES) directsave.payload ingame_trampoline.payload
 	# Fix the header/checksum.
 	./tools/fw-fixer.py $(FIRMWARE_NAME)
 
-firmware.ewram.gba: $(INFILES) ingamemenu.payload superfw.dldi.payload directsave.payload ingame_trampoline.payload src/messages_data.h ldscripts/gba_ewram.ld.i
+firmware.ewram.gba: $(INFILES) ingamemenu.payload superfw.dldi.payload directsave.payload ingame_trampoline.payload ldscripts/gba_ewram.ld.i
 	# Build the actual firmware image
 	$(CC) $(CFLAGS) -o firmware.ewram.elf $(INFILES) -T ldscripts/gba_ewram.ld.i -nostartfiles -Wl,-Map=firmware.ewram.map -Wl,--print-memory-usage -fno-builtin
 	$(OBJCOPY) --output-target=binary firmware.ewram.elf firmware.ewram.gba
@@ -202,7 +204,7 @@ ingame_trampoline.payload:	src/ingame_trampoline.S
 	$(CC) $(BASEFLAGS) -nostartfiles -T ldscripts/gba_ingametramp.ld -o ingame_trampoline.elf src/ingame_trampoline.S
 	$(OBJCOPY) --output-target=binary ingame_trampoline.elf ingame_trampoline.payload
 
-src/messages_data.h:	res/messages.py
+src/messages_data.c:	res/messages.py
 	./res/messages.py h main > src/messages_data.h && ./res/messages.py c main > src/messages_data.c
 
 

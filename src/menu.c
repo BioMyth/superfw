@@ -204,19 +204,7 @@ static uint32_t hfrarpt = INITIAL_KEY_REPEAT_FRAMES;
 
 static bool is_repeating = false;
 
-unsigned lang_lookup(uint16_t code)
-{
-  for (unsigned i = 0; i < LANG_COUNT; i++)
-    if (lang_codes[i] == code)
-      return i;
 
-  return 0; // Fallback to default (english)
-}
-
-uint16_t lang_getcode()
-{
-  return lang_codes[lang_id];
-}
 
 inline bool isascii(char code)
 {
