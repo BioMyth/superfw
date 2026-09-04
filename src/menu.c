@@ -1424,7 +1424,7 @@ void render_settings(volatile uint8_t *frame)
 
 void render_ui_settings(volatile uint8_t *frame)
 {
-  // render_menu(frame, &smenu.anim_state, &uiSetMenu);
+  render_menu(frame, &smenu.anim_state, &uiSetMenu);
 }
 
 void render_info(volatile uint8_t *frame)
@@ -1491,7 +1491,7 @@ void render_info(volatile uint8_t *frame)
 
 void render_tools(volatile uint8_t *frame)
 {
-  // render_menu(frame, &smenu.anim_state, &toolsMenu);
+  render_menu(frame, &smenu.anim_state, &toolsMenu);
 }
 
 void reload_theme(unsigned thnum)
