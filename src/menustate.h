@@ -5,6 +5,40 @@
 #include "flash_mgr.h"
 #include "patchengine.h"
 
+enum
+{
+  GbaLoadPopInfo = 0,
+  GbaLoadPopLoadS = 1,
+  GbaLoadPopPatch = 2,
+  GbaLoadCNT = 3,
+
+  GbaNorWrPatch = 1,
+  GbaNorWrCNT = 2,
+
+  GbaNorLoad = 1,
+  GbaNorLoadCNT = 2,
+};
+
+enum
+{
+  GBAInfoCNT = 1,
+  GBALoadButt = 0,
+
+  GBALdSetCNT = 5,
+  GBALdSetLoadP = 0,
+  GBALdSetSaveP = 1,
+  GBALdSetRTC = 2,
+  GBALdSetCheats = 3,
+  GBALdRemember = 4,
+
+  GBAPatchCNT = 5,
+  GBALoadPatch = 0,
+  GBASavePatch = 1,
+  GBAInGameMen = 2,
+  GBARTCPatch = 3,
+  GBAPatchGen = 4,
+};
+
 
 typedef struct t_load_gba_info {
   // ROM information

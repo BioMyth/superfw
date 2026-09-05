@@ -47,7 +47,7 @@ static const struct menu_row ToolsMenuOptions[] = {
 };
 
 const struct menu toolsMenu = {
-    .menu_sel = &smenu.tools.selector,
+    .menu_sel = (uint8_t *) &smenu.tools.selector,
     .row_cnt = ToolMAX,
     .rows = ToolsMenuOptions
 };

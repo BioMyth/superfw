@@ -5,8 +5,10 @@
 */
 #include "menu_renderer.h"
 
-static void render_scrollable_text (char *tmpbuf, volatile uint8_t *frame_buf, uint8_t x, uint8_t y, uint8_t maxw, unsigned *anim_state) {
-    unsigned twidth = font_width(tmpbuf);
+static void render_scrollable_text (char *tmpbuf, volatile uint8_t *frame_buf, 
+  const uint8_t x, const uint8_t y, const uint8_t maxw,
+  unsigned *anim_state) {
+    const unsigned twidth = font_width(tmpbuf);
     // Render rotating text if exceeding max width & max width isn't 0
     if (twidth > maxw && maxw)
       draw_text_ovf_rotate(tmpbuf, frame_buf, x, y, maxw, anim_state);
@@ -15,13 +17,19 @@ static void render_scrollable_text (char *tmpbuf, volatile uint8_t *frame_buf, u
       draw_central_text_ovf(tmpbuf, frame_buf, x + maxw / 2, y, maxw);
 }
 
-static void render_setting_row(volatile uint8_t *frame_buf, const char *title, const char *value, uint8_t x, uint8_t y) {
+static void render_setting_row(volatile uint8_t *frame_buf, 
+  const char *title, const char *value, 
+  const uint8_t x, const uint8_t y) {
   draw_text_ovf(title, frame_buf, x, y, SCREEN_WIDTH - 2*x);
   draw_central_text(value, frame_buf, 170, y);
 }
 
 
-static void render_menu_option(volatile uint8_t *frame_buf, unsigned *anim_state, const struct menu_row *row, bool selected, uint8_t x, uint8_t y) {
+static void render_menu_option(volatile uint8_t *frame_buf, 
+  const unsigned anim_state, const struct menu_row *row, 
+  const bool selected, 
+  const uint8_t x, const uint8_t y) {
+
   char tmpbuf[TMP_BUF_SIZE];
   switch (row->type)
   {
@@ -56,7 +64,7 @@ static void render_menu_option(volatile uint8_t *frame_buf, unsigned *anim_state
       x, y);
     break;
   case MENU_ROW_CUSTOM:
-    row->callback(tmpbuf, TMP_BUF_SIZE);
+    row->callback(tmpbuf, TMP_BUF_SIZE, row->context);
     render_setting_row(frame_buf, msgs[lang_id][row->title_trans], tmpbuf, x, y);
     break;
   case MENU_ROW_BUTT:
@@ -69,7 +77,7 @@ static void render_menu_option(volatile uint8_t *frame_buf, unsigned *anim_state
   case MENU_ROW_TXT:
     draw_text_ovf(msgs[lang_id][row->title_trans], frame_buf, 22, y, 144);
     if (selected) {
-      draw_central_text("▸", frame_buf, MENU_MARGIN + ((*anim_state & 0xFF) >> 6), y);
+      draw_central_text("▸", frame_buf, MENU_MARGIN + ((anim_state & 0xFF) >> 6), y);
     }
     break;
   default:
@@ -77,11 +85,15 @@ static void render_menu_option(volatile uint8_t *frame_buf, unsigned *anim_state
   }
 }
 
-void render_screen(volatile uint8_t *frame, uint8_t tab, enum MenuTab min_tab) {
+// TODO: Rename to render menu
+void render_screen(volatile uint8_t *frame, 
+  const uint8_t tab, 
+  const enum MenuTab min_tab) {
+
   reset_sprites();
 
   // Render the tab menu on top (rows 0..15), highlighting the selected option
-  render_bar(&frame[0], dup8(MENU_COLOR_FG), 0, 0, SCREEN_WIDTH, SPRITE_SIZE);
+  render_bar(&frame[0], dup8((uint8_t) MENU_COLOR_FG), 0, 0, SCREEN_WIDTH, SPRITE_SIZE);
 
   // Render icon bar
   for (unsigned i = min_tab; i < MENU_TAB_MAX; i++)
@@ -91,71 +103,86 @@ void render_screen(volatile uint8_t *frame, uint8_t tab, enum MenuTab min_tab) {
       render_icon_trans((i - min_tab) * 16, 0, i + ICON_RECENT);
 
   // Render the main area
-  dma_memset16(&frame[SPRITE_SIZE * SCREEN_WIDTH], dup8(MENU_COLOR_BG), SCREEN_WIDTH * (SCREEN_HEIGHT - SPRITE_SIZE) / 2);
+  dma_memset16(&frame[SPRITE_SIZE * SCREEN_WIDTH], 
+    dup8((uint8_t) MENU_COLOR_BG),
+    SCREEN_WIDTH * (SCREEN_HEIGHT - SPRITE_SIZE) / 2);
 }
 
-void render_menu(volatile uint8_t *frame_buf, unsigned *anim_state, const struct menu *menu) {
+// TODO: Rename to render menu page
+void render_menu(volatile uint8_t *frame_buf, 
+  unsigned *anim_state,
+  const struct menu *menu) {
+
   char tmpbuf[TMP_BUF_SIZE];
-  uint8_t numrows = (menu->bott_callback == NULL ? ROW_COUNT : ROW_COUNT - 1);
-  
-  unsigned selector = *menu->menu_sel;
 
+  const uint8_t pagerowcnt = (menu->bott_callback == NULL ? ROW_COUNT : ROW_COUNT - 1);
   // Odd number round up, e.g. 5 -> we want 3
-  uint8_t halfnumrows = numrows / 2;
-  
-  bool scroll = menu->row_cnt > numrows;
-  bool lastpage = (menu->row_cnt - selector - 1) <= halfnumrows;
-  bool firstpage = selector <= halfnumrows;
+  const uint8_t pagecenter = pagerowcnt / 2;
 
-  bool popup = menu->type == MENU_POPUP;
-  
-  uint8_t offy = (scroll ? TABS_HEIGHT + 7 : TABS_HEIGHT);
-  uint8_t offx = (popup ? 12 : MENU_MARGIN);
+  const uint8_t selector = *menu->menu_sel;
 
-  if (popup)
+  // uint8_t titlecnt = 0;
+
+  // for (uint8_t row = 0; row <= selector + titlecnt; row++)
+  //     titlecnt += menu->rows[row].type == MENU_ROW_HEADER;
+
+  // selector += titlecnt;
+
+  const uint8_t lastpagebaseopt = (menu->row_cnt <= pagerowcnt ? 0 : menu->row_cnt - pagerowcnt);
+  const uint8_t baseopt = MIN(
+    (selector <= pagecenter ? 0 : selector - pagecenter ),
+    lastpagebaseopt
+  );
+
+  // npf_snprintf(tmpbuf, TMP_BUF_SIZE, "%i", selector);
+  // draw_text_ovf(tmpbuf, frame_buf, MENU_MARGIN + SUBMENU_BORDER, 23, 64);
+    
+  const bool scroll = menu->row_cnt > pagerowcnt;
+  const bool lastpage = baseopt == lastpagebaseopt;
+
+  const bool popup = menu->type == MENU_POPUP;
+  
+  const uint8_t offy = (scroll ? TABS_HEIGHT + 7 : TABS_HEIGHT);
+  const uint8_t offx = (popup ? 12 : MENU_MARGIN);
+
+  if (popup) {
     draw_box_outline(frame_buf, 
       SUBMENU_BORDER, SCREEN_WIDTH - SUBMENU_BORDER, 
       TOP_BAR_HEIGHT + SUBMENU_BORDER, SCREEN_HEIGHT - SUBMENU_BORDER, 
       MENU_COLOR_FG);
+    draw_text_ovf("⯇", frame_buf, MENU_MARGIN + SUBMENU_BORDER, 23, 64);
+    draw_rightj_text("⯈", frame_buf, SCREEN_WIDTH - (MENU_MARGIN + SUBMENU_BORDER), 23);
+  }
 
-
-  if (scroll && !firstpage)
+  if (scroll && baseopt)
     draw_central_text("⯅", frame_buf, SCREEN_WIDTH / 2, 15);
   if (scroll && !lastpage)
-    draw_central_text("⯆", frame_buf, SCREEN_WIDTH / 2, ROW_HEIGHT * (numrows + 1));//125);
-
-  uint8_t baseopt;
-  // If we are in the first half of the first page or there aren't enough rows to scroll
-  if (firstpage || !scroll)
-    baseopt = 0;
-  // If we are in the second half of the last page
-  else if (lastpage) 
-    baseopt = menu->row_cnt - numrows;
-  else 
-    baseopt = selector - halfnumrows;
+    draw_central_text("⯆", frame_buf, SCREEN_WIDTH / 2, ROW_HEIGHT * (pagerowcnt + 1));
   
   // Render the highlight bar if not on a button
   // Render before text rendering occurrs so it is layered
   if (menu->rows[selector].type != MENU_ROW_BUTT)
     render_bar(frame_buf, MENU_COLOR_HI, 0, offy + (selector - baseopt) * ROW_HEIGHT, SCREEN_WIDTH, 16);
- 
-  for (uint8_t row = 0; row < MIN(numrows, menu->row_cnt); row++)
+  
+  for (uint8_t row = 0; row < MIN(pagerowcnt, menu->row_cnt); row++)
   {
-    uint16_t curropt = baseopt + row;
+    const uint16_t curropt = baseopt + row;
     if (curropt >= menu->row_cnt)
       break;
     render_menu_option(
       frame_buf,
-      anim_state, 
+      *anim_state, 
       &menu->rows[baseopt + row], 
       selector == baseopt + row, 
       offx,
       offy + row * ROW_HEIGHT
     );
+
   }
+  
   // Render the bottom bar for Helptext or additional context
   if (menu->bott_callback != NULL){
-    menu->bott_callback(tmpbuf, selector);
+    menu->bott_callback(tmpbuf, TMP_BUF_SIZE, selector, menu->context);
     if (popup){
       render_bar(
         frame_buf, MENU_COLOR_FG, 

@@ -48,7 +48,7 @@ static const struct menu_row UiSetMenuOpts[] = {
 };
 
 const struct menu uiSetMenu = {
-  .menu_sel = &smenu.uiset.selector,
+  .menu_sel = (uint8_t *) &smenu.uiset.selector,
   .row_cnt = UiSettMAX,
   .rows = UiSetMenuOpts
 };

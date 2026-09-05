@@ -258,7 +258,6 @@ void menu_flip() {
   /* Copy icons directly instead of iterating */
   // Divide by 4 since memcpy32 copies 4 bytes at a time
   dma_memcpy32(&MEM_OAM[0], fstate.objs, fstate.objnum * sizeof(struct oamobj_t)/4);
-  // dma_memcpy16(&MEM_OAM[0], fstate.objs, fstate.objnum * sizeof(oamobj_t)/2);
   dma_memset16(&MEM_OAM[fstate.objnum*4], 0, 256 - fstate.objnum*2);  // Clear unused objects
   REG_DISPCNT = (REG_DISPCNT & ~0x10) | (fstate.framen << 4);
   fstate.framen ^= 1;

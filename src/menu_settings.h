@@ -33,37 +33,39 @@ enum settingsOptions{
   DefsSavePol,
   DefsPrefDS,
   SettSave,
-  SettMAX
+  SettMAX = SettSave - 2,
+
+
 };
 
-static void  rtcRenderCallback(char *tmpbuf, uint16_t buffsize){
+static void  rtcRenderCallback(char *tmpbuf, const uint16_t buffsize, const void *context){
         t_dec_date d;
         timestamp2date(rtcvalue_default, &d);
         npf_snprintf(tmpbuf, buffsize, "20%02d/%02d/%02d %02d:%02d",
           d.year, d.month, d.day, d.hour, d.min);
 }
 
-static void rtcSpeedRenderCallback(char *tmpbuf, uint16_t buffsize) {
+static void rtcSpeedRenderCallback(char *tmpbuf, const uint16_t buffsize, const void *context) {
   unsigned spdmsg = rtcspeed_default ? (MSG_UIS_SPD0 + rtcspeed_default - 1) : MSG_STILLRTC;
   npf_snprintf(tmpbuf, buffsize, "< %s >", msgs[lang_id][spdmsg]);
 }
 
-static void hotkeyRenderCallback(char *tmpbuf, uint16_t buffsize){
+static void hotkeyRenderCallback(char *tmpbuf, const uint16_t buffsize, const void *context){
       npf_snprintf(tmpbuf, buffsize, "< %s >", hotkey_list[hotkey_combo].cname);
 }
 
-static void savePathRenderCallback(char *tmpbuf, uint16_t buffsize){
+static void savePathRenderCallback(char *tmpbuf, const uint16_t buffsize, const void *context){
   if (save_path_default == SaveRomName)
     npf_snprintf(tmpbuf, buffsize, "< %s >", msgs[lang_id][MSG_NEXTTO_ROM]);
   else
     npf_snprintf(tmpbuf, buffsize, "< %s >", save_paths[save_path_default]);
 }
 
-static void savePathFlashRenderCallback(char *tmpbuf, uint16_t buffsize) {
+static void savePathFlashRenderCallback(char *tmpbuf, const uint16_t buffsize, const void *context) {
   npf_snprintf(tmpbuf, buffsize, "< %s >", save_paths[save_path_nor_default]);
 }
 
-static void saveStatePathRenderCallback(char *tmpbuf, uint16_t buffsize){
+static void saveStatePathRenderCallback(char *tmpbuf, const uint16_t buffsize, const void *context){
   npf_snprintf(tmpbuf, buffsize, "< %s >", savestates_paths_display[state_path_default]);
 }
 
@@ -182,28 +184,28 @@ static const struct menu_row SetMenuOpts[] = {
   }
 };
 
-
-void uiSetHelpCallback(char *tmp, uint8_t row_sel) {
-  if (row_sel == SettSaveLoc) {
+// TODO: Make settings a struct type or some BS & provide via context here
+void uiSetHelpCallback(char *tmp, uint16_t size, uint8_t selector, const void *context) {
+  if (selector == SettSaveLoc) {
     if (save_path_default == SaveRomName)
       strcpy(tmp, msgs[lang_id][MSG_SAVE_TYPE_NR]);
     else
-      npf_snprintf(tmp, TMP_BUF_SIZE, msgs[lang_id][MSG_SAVE_TYPE_PT], save_paths[save_path_default]);
+      npf_snprintf(tmp, size, msgs[lang_id][MSG_SAVE_TYPE_PT], save_paths[save_path_default]);
   }
-  else if (row_sel == SettStateLoc) {
-    npf_snprintf(tmp, TMP_BUF_SIZE, msgs[lang_id][MSG_STATE_TYPE_PT], savestates_paths[state_path_default]);
+  else if (selector == SettStateLoc) {
+    npf_snprintf(tmp, size, msgs[lang_id][MSG_STATE_TYPE_PT], savestates_paths[state_path_default]);
   }
   #ifdef SUPPORT_NORGAMES
-  else if (row_sel == SettSaveLocNOR) {
-    npf_snprintf(tmp, TMP_BUF_SIZE, msgs[lang_id][MSG_SAVE_TYPE_PTX], save_paths[save_path_nor_default]);
+  else if (selector == SettSaveLocNOR) {
+    npf_snprintf(tmp, size, msgs[lang_id][MSG_SAVE_TYPE_PTX], save_paths[save_path_nor_default]);
   }
   #endif
   else {
-    unsigned help_trans;
-      if( row_sel == SettBootType){
+    enum TranslationID help_trans;
+      if( selector == SettBootType){
        help_trans = MSG_BOOT_TYPE_I0 + boot_bios_splash;
       } else {
-        switch (row_sel)
+        switch (selector)
         {
         case SettSaveBkp:
           help_trans = MSG_BACKUP_I;
@@ -241,8 +243,8 @@ void uiSetHelpCallback(char *tmp, uint8_t row_sel) {
 }
 
 const struct menu globalSetMenu = {
-  .menu_sel = &smenu.set.selector,
-  .row_cnt = SettMAX,
+  .menu_sel = (uint8_t *) &smenu.set.selector,
+  .row_cnt = sizeof(SetMenuOpts) / sizeof(struct menu_row),
   .rows = SetMenuOpts,
   .bott_callback = uiSetHelpCallback
 };

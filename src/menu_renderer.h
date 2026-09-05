@@ -42,6 +42,7 @@
 * Types allowed for menu rows
 */
 enum MenuRowType {
+  MENU_ROW_BLANK,
   MENU_ROW_BOOL,
   MENU_ROW_BOOL_INV,
   MENU_ROW_BUTT,
@@ -52,7 +53,6 @@ enum MenuRowType {
   MENU_ROW_TXT,
   MENU_ROW_TXT_SCROLL,
   MENU_ROW_RTC,
-
 };
 /*
 * Types of menus available
@@ -78,31 +78,43 @@ enum MenuTab {
   MENU_TAB_MAX
 };
 
+enum TextAlign {
+  TEXT_ALIGN_RIGHT,
+  TEXT_ALIGN_LEFT,
+  TEXT_ALIGN_CENTER
+};
+
 // typedef void (menuopt_func)(char *tmpbuf, uint16_t bufsize);
 // typedef void (menubottcallback)(char *tmpbuf, uint8_t selectedOption);
 
-typedef void (custommenurow_t)(char *tmp, uint16_t size);
-typedef void (menubottcallback_t)(char *tmp, uint8_t row_sel);
+typedef void (custommenurow_t)(char *tmp, const uint16_t size, const void *context);
+typedef void (menubottcallback_t)(char *tmp, const uint16_t size, const uint8_t selector, const void *context);
 
 struct menu_row{
-  const enum TranslationID base_value_trans;
   const enum TranslationID title_trans;
   const enum MenuRowType type;
+  union 
+  {
+    const enum TranslationID base_value_trans;
+    void *context;
+  };
+  
   // Union to reduce memory footprint since these are mutually exclusive
   union
   {
-    const void (*callback)(char *tmp, uint16_t size);
+    custommenurow_t *callback;
     uint8_t *value_sel;
   };
   
 };
 
 struct menu{
+  menubottcallback_t *bott_callback;
+  void *context;
+  uint8_t *menu_sel;
+  struct menu_row *rows;
+  uint8_t row_cnt;
   const enum MenuType type;
-  const menubottcallback_t *bott_callback;
-  const int *menu_sel;
-  const uint16_t row_cnt;
-  const struct menu_row *rows;
 };
 
 // inline void render_setting_row(
@@ -111,7 +123,9 @@ struct menu{
 //   uint8_t x, uint8_t y
 // );
 
-void render_screen(volatile uint8_t *frame, uint8_t tab, enum MenuTab min_tab);
+void render_screen(volatile uint8_t *frame, 
+  const uint8_t tab,
+  const enum MenuTab min_tab);
 
 void render_menu(
   volatile uint8_t *frame, 

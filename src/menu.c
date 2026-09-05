@@ -46,6 +46,7 @@
 #include "menu_settings.h"
 #include "menu_uisettings.h"
 #include "menu_tools.h"
+#include "menu_pop_load.h"
 
 #include "res/logo.h"
 
@@ -74,7 +75,7 @@ enum
 // Starting number of frames to start repeating keypresses
 #define INITIAL_KEY_REPEAT_FRAMES 15
 // Minimum number of frames to repeat on
-#define MIN_KEY_REPEAT_FRAMES 5
+#define MIN_KEY_REPEAT_FRAMES 3
 
 #define FLASH_UNLOCK_KEYS (KEY_BUTTDOWN | KEY_BUTTB | KEY_BUTTSTA)
 #define FLASH_GO_KEYS (KEY_BUTTUP | KEY_BUTTL | KEY_BUTTR)
@@ -85,39 +86,7 @@ enum
   DefsMAX = 4,
 };
 
-enum
-{
-  GbaLoadPopInfo = 0,
-  GbaLoadPopLoadS = 1,
-  GbaLoadPopPatch = 2,
-  GbaLoadCNT = 3,
 
-  GbaNorWrPatch = 1,
-  GbaNorWrCNT = 2,
-
-  GbaNorLoad = 1,
-  GbaNorLoadCNT = 2,
-};
-
-enum
-{
-  GBAInfoCNT = 1,
-  GBALoadButt = 0,
-
-  GBALdSetCNT = 5,
-  GBALdSetLoadP = 0,
-  GBALdSetSaveP = 1,
-  GBALdSetRTC = 2,
-  GBALdSetCheats = 3,
-  GBALdRemember = 4,
-
-  GBAPatchCNT = 5,
-  GBALoadPatch = 0,
-  GBASavePatch = 1,
-  GBAInGameMen = 2,
-  GBARTCPatch = 3,
-  GBAPatchGen = 4,
-};
 
 enum
 {
@@ -203,6 +172,8 @@ static uint32_t hfracnt = 0;
 static uint32_t hfrarpt = INITIAL_KEY_REPEAT_FRAMES;
 
 static bool is_repeating = false;
+
+struct menu menupopload;
 
 
 
@@ -1245,7 +1216,7 @@ void render_gba_load_popup(volatile uint8_t *frame)
   const t_load_gba_info *info = &spop.p.load.i;
   const t_patch *p = get_game_patch(info);
   const char *ht = NULL;
-  if (spop.submenu != GbaLoadPopInfo)
+  if (spop.submenu != GbaLoadPopInfo && spop.submenu != GbaLoadPopLoadS)
   {
     const unsigned offy = 44;
     render_bar(frame, MENU_COLOR_HI, 8, offy + spop.selector * 18, SCREEN_WIDTH - 16, 16);
@@ -1258,6 +1229,7 @@ void render_gba_load_popup(volatile uint8_t *frame)
     draw_central_text(msgs[lang_id][MSG_LOAD_GBA], frame, 120, 134);
     break;
   case GbaLoadPopLoadS:
+    //render_menu(frame, &spop.anim, &menupopload);
     ht = render_gbarom_loading(frame, &spop.p.load.l, info->rtc_patch_enabled, spop.selector);
     break;
   case GbaLoadPopPatch:
@@ -1619,6 +1591,8 @@ void menu_init(int sram_testres)
   // If there's a test result to report, create a popup
   if (sram_testres >= 0)
     spop.alert_msg = sram_testres ? msgs[lang_id][MSG_SRAMTST_FAIL] : msgs[lang_id][MSG_SRAMTST_OK];
+  initLoadOptMenu(&spop, false);
+
 }
 
 int movedir_up()
@@ -2557,20 +2531,28 @@ static void keypress_menu_settings(unsigned newkeys, uint16_t keypresses)
   if (newkeys & KEY_BUTTUP)
   {
     // Max 1 to skip the top option in the settings
-    smenu.set.selector = MAX(1, smenu.set.selector - keypresses);
-    // Skip the title of the option section
-    if (smenu.menu_tab == MENU_TAB_SETT && smenu.set.selector == SettTitle2)
-    {
-      smenu.set.selector = MAX(1, smenu.set.selector - 1);
+    smenu.set.selector = (keypresses >= smenu.set.selector ? 1 : smenu.set.selector - keypresses);
+    if (globalSetMenu.rows[*globalSetMenu.menu_sel].type == MENU_ROW_HEADER){
+      (*globalSetMenu.menu_sel)--;
     }
+    // smenu.set.selector = (keypresses > smenu.set.selector ? 0 : smenu.set.selector - keypresses);
+    // Skip the title of the option section
+    //if (smenu.menu_tab == MENU_TAB_SETT && smenu.set.selector == SettTitle2)
+    //{
+    //  smenu.set.selector = MAX(1, smenu.set.selector - 1);
+    //}
   }
   if (newkeys & KEY_BUTTDOWN)
   {
-    smenu.set.selector = MIN(SettMAX - 1, smenu.set.selector + keypresses);
-    if (smenu.menu_tab == MENU_TAB_SETT && (smenu.set.selector == SettTitle1 || smenu.set.selector == SettTitle2))
-    {
-      smenu.set.selector = MIN(SettMAX - 1, smenu.set.selector + 1);
+    // -1 to 0 base -2 to ignore headers
+    smenu.set.selector = MIN(globalSetMenu.row_cnt - 1, smenu.set.selector + keypresses);
+    if (globalSetMenu.rows[*globalSetMenu.menu_sel].type == MENU_ROW_HEADER){
+      (*globalSetMenu.menu_sel)++;
     }
+    //if (smenu.menu_tab == MENU_TAB_SETT && (smenu.set.selector == SettTitle1 || smenu.set.selector == SettTitle2))
+    //{
+    //  smenu.set.selector = MIN(SettMAX - 1, smenu.set.selector + 1);
+    //}
   }
   if (newkeys & KEY_BUTTLEFT)
   {
@@ -2800,16 +2782,24 @@ static void keypress_menu_info(unsigned newkeys, uint16_t keypresses)
     enable_flashing = true;
 }
 
-void menu_keypress(unsigned newkeys, uint16_t deltaframes)
+void menu_keypress(unsigned currkeys, uint16_t deltaframes)
 {
   // TODO: Move this keypress code into a new function for maintainability
   // TODO: Fix scenario when pressing & releasing different key causes a refire of keypresses
   //    Update it so that the system only passes initial key presses, not hold/releases
-  bool repeat_key_held = (prevkeys == KEY_BUTTDOWN || prevkeys == KEY_BUTTUP || prevkeys == KEY_BUTTLEFT || prevkeys == KEY_BUTTRIGHT || prevkeys == KEY_BUTTL || prevkeys == KEY_BUTTR);
+  const unsigned rept_key_msk = KEY_BUTTDOWN | KEY_BUTTUP 
+  | KEY_BUTTLEFT | KEY_BUTTRIGHT 
+  | KEY_BUTTL | KEY_BUTTR;
 
-  bool hold_key_press = (newkeys == prevkeys);
+  bool repeat_key_held = prevkeys & rept_key_msk;
 
-  prevkeys = newkeys;
+  // Needs a rework for the hold keys
+  bool hold_key_press = (currkeys == prevkeys);
+
+  // Remove hold keys from prevkeys & carry over values from currkeys
+  unsigned newkeys = currkeys ^ (prevkeys & ~rept_key_msk & currkeys);
+
+  prevkeys = currkeys;
 
   // If we are holding the same keys but not a repeating key, skip
   if (hold_key_press && !repeat_key_held)
@@ -2833,7 +2823,7 @@ void menu_keypress(unsigned newkeys, uint16_t deltaframes)
     hfracnt += deltaframes;
     keypresses = hfracnt / hfrarpt;
     hfracnt %= hfrarpt;
-    hfrarpt = MAX(MIN_KEY_REPEAT_FRAMES, hfrarpt - keypresses);
+    hfrarpt = MAX(MIN_KEY_REPEAT_FRAMES, hfrarpt - (keypresses * 2));
   }
   // Exit repeating state
   else if (is_repeating)
